@@ -16,9 +16,13 @@
 - 支持全局、项目共享和项目本地三个作用域。
 - 使用选择器配置主模型、子代理模型、Advisor 模型和回退模型链；
   常规模型无需手动输入。
+- 包含当前 `fable`、`best`、`sonnet`、`opus` 和 `haiku` 别名，并在
+  每个分层选择器中提供明确的**默认 / 继承**选项。
 - 配置推理、代理、权限、沙箱、界面和行为。
 - TUI 可按系统语言自动切换英语、俄语或简体中文。
-- 支持搜索、继承值与来源显示、暂存修改和保存前 diff。
+- 使用 Claude Code 风格的暖色配色、清晰的标题层级，以及“控制什么 /
+  为什么需要”的易懂说明。
+- 固定操作栏会一直显示保存、快捷键、继承来源、暂存修改和保存前 diff。
 - 检测写入冲突、自动备份，并拒绝覆盖无效 JSON。
 - 正确识别 Git 仓库和 worktree。
 - 为 macOS、Linux 和 Windows 提供单一原生二进制文件。
@@ -88,10 +92,27 @@ Claude Configurator 只编辑后三层，不修改组织托管策略。
 agent teams 和 workflow agents，并覆盖单个代理内的模型选择。保存后请重启
 已经运行的 Claude Code 会话。
 
-选择器包含 Claude Code 稳定别名：`default`、`best`、`sonnet`、`opus`、
-`haiku`、1M 上下文选项和 `opusplan`。最后的**自定义模型 ID…**仅用于
-gateway 或提供商特定部署；常规模型选择不会再打开字符串输入框。详见
+选择器包含 Claude Code 当前别名：`default`、`best`、`fable`、
+`sonnet`、`opus`、`haiku`、1M 上下文选项和 `opusplan`。Fable 同时
+提供推荐的 `fable` 别名和固定预设。最后的**自定义模型 ID…**仅用于
+gateway 或提供商特定部署；常规模型选择不会打开字符串输入框。详见
 [官方模型配置文档](https://code.claude.com/docs/en/model-config)。
+
+### 继承、重置与保存
+
+分层选择器的第一项是**默认 / 继承**。它会删除当前作用域中的 JSON 键，
+随后回退到 project、global、managed 或 Claude 自身的默认解析；不会写入
+一个伪默认字符串。详情面板和底部操作栏也会始终显示
+**[U] 重置并继承**。
+
+所有更改在按下 **[S] 保存**前保持暂存。保存按钮始终可见，会显示更改
+数量，并在写入前打开 diff。
+
+### Claude Code 主题
+
+打开**界面 → Claude Code 主题**，即可从列表选择自动、深色、浅色、
+色觉友好或终端 ANSI 主题。`~/.claude/themes/*.json` 中已有的自定义主题
+也会自动加入列表，无需手动输入主题名。
 
 ### 界面语言
 
@@ -110,7 +131,7 @@ Claude Code 设置。
 | `g`、`p`、`l` | Global、project、local |
 | `Space` | 切换布尔值 |
 | `/` | 搜索 |
-| `u` | 删除当前值并继承 |
+| `u` | 删除当前作用域的值并继承 |
 | `s` | 查看 diff 并保存 |
 | `r` | 从磁盘重新加载 |
 | `?` | 帮助 |

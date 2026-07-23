@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image/color"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -211,12 +212,7 @@ func (m *Model) handleBrowseKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			break
 		}
 		if spec, ok := m.currentSpec(); ok {
-			if spec.App {
-				m.setLanguage(languageAuto)
-				break
-			}
-			config.Unset(m.drafts[m.scope], spec.Path)
-			m.status = m.tr("status.inherit", m.specLabel(spec.ID, spec.Label))
+			m.unset(spec)
 		}
 	case "s":
 		if !m.dirty(m.scope) {
@@ -266,6 +262,7 @@ func (m *Model) openEditor() {
 	if !ok {
 		return
 	}
+	spec = m.withDynamicOptions(spec)
 	m.editSpec = spec
 	switch spec.Kind {
 	case catalog.Boolean:
@@ -284,6 +281,39 @@ func (m *Model) openEditor() {
 	}
 }
 
+func (m *Model) withDynamicOptions(spec catalog.Spec) catalog.Spec {
+	if spec.ID != "theme" {
+		return spec
+	}
+	seen := make(map[string]bool, len(spec.Options))
+	for _, option := range spec.Options {
+		seen[option] = true
+	}
+	var custom []string
+	themeDir := filepath.Join(filepath.Dir(m.workspace.Paths.Global), "themes")
+	if entries, err := os.ReadDir(themeDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+				continue
+			}
+			option := "custom:" + strings.TrimSuffix(entry.Name(), ".json")
+			if !seen[option] {
+				seen[option] = true
+				custom = append(custom, option)
+			}
+		}
+	}
+	if value, _, ok := m.effective(spec); ok {
+		option := fmt.Sprint(value)
+		if strings.HasPrefix(option, "custom:") && !seen[option] {
+			custom = append(custom, option)
+		}
+	}
+	slices.Sort(custom)
+	spec.Options = append(append([]string(nil), spec.Options...), custom...)
+	return spec
+}
+
 func (m *Model) openChoice(spec catalog.Spec, forList bool, listIndex int) {
 	m.editSpec = spec
 	m.choiceForList = forList
@@ -296,25 +326,41 @@ func (m *Model) openChoice(spec catalog.Spec, forList bool, listIndex int) {
 		if listIndex >= 0 && listIndex < len(items) {
 			current, ok = items[listIndex], true
 		}
+	} else if spec.App {
+		current, ok = string(m.languageMode), true
 	} else {
-		current, _, ok = m.effective(spec)
+		current, ok = config.Get(m.drafts[m.scope], spec.Path)
 	}
 	if ok {
 		if index := slices.Index(spec.Options, fmt.Sprint(current)); index >= 0 {
 			m.choice = index
+			if m.choiceIncludesInherit() {
+				m.choice++
+			}
 		} else if spec.AllowCustom {
 			m.choice = len(spec.Options)
+			if m.choiceIncludesInherit() {
+				m.choice++
+			}
 		}
 	}
 	m.screen = editChoice
 }
 
 func (m *Model) choiceOptions() []string {
-	options := append([]string(nil), m.editSpec.Options...)
+	var options []string
+	if m.choiceIncludesInherit() {
+		options = append(options, inheritChoice)
+	}
+	options = append(options, m.editSpec.Options...)
 	if m.editSpec.AllowCustom {
 		options = append(options, customChoice)
 	}
 	return options
+}
+
+func (m *Model) choiceIncludesInherit() bool {
+	return !m.choiceForList && !m.editSpec.App
 }
 
 func (m *Model) toggle(spec catalog.Spec) {
@@ -340,6 +386,11 @@ func (m *Model) handleChoiceKey(msg tea.KeyPressMsg) {
 		m.choice = (m.choice + 1) % len(options)
 	case "enter", " ":
 		option := options[m.choice]
+		if option == inheritChoice {
+			m.unset(m.editSpec)
+			m.screen = browse
+			return
+		}
 		if option == customChoice {
 			value := ""
 			if m.choiceForList {
@@ -366,6 +417,15 @@ func (m *Model) handleChoiceKey(msg tea.KeyPressMsg) {
 			m.screen = browse
 		}
 	}
+}
+
+func (m *Model) unset(spec catalog.Spec) {
+	if spec.App {
+		m.setLanguage(languageAuto)
+		return
+	}
+	config.Unset(m.drafts[m.scope], spec.Path)
+	m.status = m.tr("status.inherit", m.specLabel(spec.ID, spec.Label))
 }
 
 func (m *Model) handleListKey(msg tea.KeyPressMsg) {
@@ -652,6 +712,21 @@ func (m *Model) anyDirty() bool {
 	return m.dirty(config.Global) || m.dirty(config.Project) || m.dirty(config.Local)
 }
 
+func (m *Model) dirtyCount(scope config.Scope) int {
+	count := 0
+	for _, spec := range catalog.Specs {
+		if spec.App {
+			continue
+		}
+		old, oldOK := config.Get(m.workspace.Docs[scope].Data, spec.Path)
+		next, nextOK := config.Get(m.drafts[scope], spec.Path)
+		if oldOK != nextOK || !config.Equal(old, next) {
+			count++
+		}
+	}
+	return count
+}
+
 func (m *Model) currentSpec() (catalog.Spec, bool) {
 	items := m.visibleSpecs()
 	if len(items) == 0 {
@@ -676,8 +751,9 @@ func (m *Model) visibleSpecs() []catalog.Spec {
 		}
 		haystack := strings.ToLower(
 			spec.Label + " " + m.specLabel(spec.ID, spec.Label) + " " +
-				spec.Path + " " + spec.Description + " " +
-				m.specDescription(spec.ID, spec.Description),
+				spec.Path + " " + spec.Description + " " + spec.Purpose + " " +
+				m.specDescription(spec.ID, spec.Description) + " " +
+				m.specPurpose(spec.ID, spec.Purpose),
 		)
 		if strings.Contains(haystack, query) {
 			specs = append(specs, spec)
@@ -768,7 +844,7 @@ func (m *Model) View() tea.View {
 }
 
 func (m *Model) renderTiny() string {
-	title := m.style("#006D77", "#67E8F9").Bold(true).Render("Claude Configurator")
+	title := m.accent().Bold(true).Render("✻  CLAUDE CONFIGURATOR")
 	return title + "\n\n" + m.tr("tiny.text") + "\n\n" + m.tr("tiny.quit")
 }
 
@@ -812,21 +888,28 @@ func (m *Model) renderBrowser() string {
 }
 
 func (m *Model) renderHeader() string {
-	title := m.style("#006D77", "#67E8F9").Bold(true).Render("◆ CLAUDE CONFIG")
+	title := m.accent().Bold(true).Render("✻  CLAUDE CONFIGURATOR")
 	versionText := m.version
 	if versionText != "dev" && !strings.HasPrefix(versionText, "v") {
 		versionText = "v" + versionText
 	}
 	version := m.muted().Render(" " + versionText)
-	path := m.workspace.Paths.For(m.scope)
 	dirty := ""
 	if m.dirty(m.scope) {
 		dirty = "  " + m.warning().Render(m.tr("header.staged"))
 	}
-	left := title + version + dirty
-	right := m.muted().Render(truncate(path, max(10, m.width-lipgloss.Width(left)-2)))
-	gap := max(1, m.width-lipgloss.Width(left)-lipgloss.Width(right))
-	first := left + strings.Repeat(" ", gap) + right
+	first := title + version + dirty
+
+	subtitle := m.muted().Render(truncate(m.tr("header.subtitle"), m.width))
+	second := subtitle
+	if m.width >= 88 {
+		path := m.workspace.Paths.For(m.scope)
+		right := m.muted().Render(truncate(path, max(18, m.width/2)))
+		leftWidth := max(16, m.width-lipgloss.Width(right)-2)
+		left := m.muted().Render(truncate(m.tr("header.subtitle"), leftWidth))
+		gap := max(1, m.width-lipgloss.Width(left)-lipgloss.Width(right))
+		second = left + strings.Repeat(" ", gap) + right
+	}
 
 	var scopes []string
 	for _, item := range []struct {
@@ -842,26 +925,65 @@ func (m *Model) renderHeader() string {
 	}
 	breadcrumb := m.renderBreadcrumb()
 	scopeLine := strings.Join(scopes, " ")
-	secondGap := max(1, m.width-lipgloss.Width(scopeLine)-lipgloss.Width(breadcrumb))
-	second := scopeLine + strings.Repeat(" ", secondGap) + breadcrumb
+	third := scopeLine
+	if lipgloss.Width(scopeLine)+lipgloss.Width(breadcrumb)+2 <= m.width {
+		secondGap := max(1, m.width-lipgloss.Width(scopeLine)-lipgloss.Width(breadcrumb))
+		third = scopeLine + strings.Repeat(" ", secondGap) + breadcrumb
+	}
 	rule := m.muted().Render(strings.Repeat("─", max(1, m.width)))
-	return first + "\n" + second + "\n" + rule
+	return first + "\n" + second + "\n" + third + "\n" + rule
 }
 
 func (m *Model) renderFooter() string {
-	keys := m.tr("footer.categories")
+	saveLabel := m.tr("action.save")
+	dirtyCount := m.dirtyCount(m.scope)
+	if dirtyCount > 0 {
+		saveLabel = m.tr("action.save_count", dirtyCount)
+	}
+	actions := []string{
+		m.action("Enter", m.tr("action.open"), false),
+		m.action("S", saveLabel, dirtyCount > 0),
+		m.action("/", m.tr("action.search"), false),
+		m.action("G/P/L", m.tr("action.scope"), false),
+		m.action("?", m.tr("action.help"), false),
+		m.action("Q", m.tr("action.quit"), false),
+	}
+	hint := m.tr("footer.hint.categories")
 	if m.focus == 1 || m.query != "" {
-		keys = m.tr("footer.settings")
+		actions = []string{
+			m.action("Enter", m.tr("action.edit"), false),
+			m.action("U", m.tr("action.inherit"), false),
+			m.action("S", saveLabel, dirtyCount > 0),
+			m.action("Esc", m.tr("action.back"), false),
+			m.action("?", m.tr("action.help"), false),
+		}
+		hint = m.tr("footer.hint.settings")
 	}
 	if m.status != "" {
-		keys = "  " + m.status
+		hint = m.status
 	}
-	return m.muted().Width(max(1, m.width)).Render(truncate(keys, m.width))
+	lines := fitActionLines(actions, m.width)
+	lines = append(lines, m.muted().Render(truncate("  "+hint, m.width)))
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) action(key, label string, primary bool) string {
+	text := "[" + key + "] " + label
+	if primary {
+		style := lipgloss.NewStyle().Bold(true)
+		if !m.noColor {
+			style = style.
+				Foreground(m.color("#FFF9F5", "#1A1412")).
+				Background(m.color("#D97757", "#DA7756"))
+		}
+		return style.Render(" " + text + " ")
+	}
+	return m.accent().Bold(true).Render("["+key+"]") + " " + m.text().Render(label)
 }
 
 func (m *Model) renderBreadcrumb() string {
 	if m.query != "" {
-		return m.style("#6D28D9", "#C4B5FD").Bold(true).Render(m.tr("breadcrumb.search", m.query))
+		return m.accent().Bold(true).Render(m.tr("breadcrumb.search", m.query))
 	}
 	menu := m.muted().Render(m.tr("breadcrumb.menu"))
 	if m.focus == 0 {
@@ -875,11 +997,12 @@ func (m *Model) renderBreadcrumb() string {
 func (m *Model) renderCategoryMenu(width, height int) string {
 	var lines []string
 	categories := catalog.Categories()
-	stride := 3
-	if width >= 76 {
-		stride = 2
-	}
+	spacious := height >= len(categories)*3-1
+	stride := 2
 	visible := max(1, height/stride)
+	if spacious {
+		visible = len(categories)
+	}
 	start := 0
 	if m.category >= visible {
 		start = m.category - visible + 1
@@ -887,20 +1010,19 @@ func (m *Model) renderCategoryMenu(width, height int) string {
 	end := min(len(categories), start+visible)
 	for i := start; i < end; i++ {
 		category := categories[i]
-		marker := "◇"
-		style := m.muted()
+		marker := " "
+		titleStyle := m.text().Bold(true)
 		if i == m.category {
-			marker = "◆"
-			style = m.selectedStyle()
+			marker = "❯"
+			titleStyle = m.accent().Bold(true)
 		}
-		title := fmt.Sprintf("%s  %s  ·  %s",
-			marker,
-			m.categoryLabel(category),
-			m.tr("category.settings_count", m.categoryCount(category)),
-		)
-		lines = append(lines, style.Width(max(1, width)).Render(truncate(title, width)))
-		lines = append(lines, m.muted().Render("   "+truncate(m.categoryDescription(category), max(4, width-3))))
-		if stride == 3 {
+		count := m.tr("category.settings_count", m.categoryCount(category))
+		left := truncate(marker+"  "+m.categoryLabel(category), max(4, width-lipgloss.Width(count)-1))
+		gap := max(1, width-lipgloss.Width(left)-lipgloss.Width(count))
+		title := titleStyle.Render(left) + strings.Repeat(" ", gap) + m.muted().Render(count)
+		lines = append(lines, title)
+		lines = append(lines, m.muted().Render("    "+truncate(m.categoryDescription(category), max(4, width-4))))
+		if spacious && i < end-1 {
 			lines = append(lines, "")
 		}
 	}
@@ -995,19 +1117,36 @@ func (m *Model) renderDetail(width int) string {
 		path = "claude-configurator/config.json"
 	}
 	lines := []string{
-		m.accent().Bold(true).Render(m.specLabel(spec.ID, spec.Label)),
-		m.muted().Render(path),
+		m.accent().Bold(true).Render("▌ ") + m.text().Bold(true).Render(m.specLabel(spec.ID, spec.Label)),
 		"",
-		m.muted().Render(m.tr("detail.this_scope")),
-		wrap(target, width),
+		m.muted().Render(m.tr("detail.key", path)),
 		"",
-		m.muted().Render(m.tr("detail.effective")),
-		wrap(resolved, width),
+		m.sectionTitle(m.tr("detail.this_scope")),
+		m.text().Bold(true).Render(wrap(target, width)),
 	}
+	if !spec.App {
+		if ownOK {
+			lines = append(lines, m.action("U", m.tr("action.inherit"), false))
+		} else {
+			lines = append(lines, m.muted().Render(wrap(m.tr("detail.inherit_hint"), width)))
+		}
+	}
+	lines = append(lines,
+		"",
+		m.sectionTitle(m.tr("detail.effective")),
+		m.text().Bold(true).Render(wrap(resolved, width)),
+	)
 	if source != "" {
 		lines = append(lines, m.muted().Render(m.tr("detail.source", m.sourceLabel(source))))
 	}
-	lines = append(lines, "", wrap(m.specDescription(spec.ID, spec.Description), width))
+	lines = append(lines,
+		"",
+		m.sectionTitle(m.tr("detail.what")),
+		m.text().Render(wrap(m.specDescription(spec.ID, spec.Description), width)),
+		"",
+		m.sectionTitle(m.tr("detail.why")),
+		m.text().Render(wrap(m.specPurpose(spec.ID, spec.Purpose), width)),
+	)
 	if len(spec.Options) > 0 {
 		var options []string
 		for _, option := range spec.Options {
@@ -1022,6 +1161,10 @@ func (m *Model) renderDetail(width int) string {
 		lines = append(lines, "", m.muted().Render(m.tr("detail.app_storage", m.preferences)))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (m *Model) sectionTitle(title string) string {
+	return m.muted().Bold(true).Render(title)
 }
 
 func (m *Model) displayValue(spec catalog.Spec, value any) string {
@@ -1089,7 +1232,17 @@ func (m *Model) renderTextEditor() string {
 func (m *Model) renderChoice() string {
 	options := m.choiceOptions()
 	var lines []string
-	visible := max(3, m.height-10)
+	contentWidth := m.modalContentWidth()
+	description := wrap(m.specDescription(m.editSpec.ID, m.editSpec.Description), contentWidth)
+	inheritHelp := ""
+	if m.choiceIncludesInherit() {
+		inheritHelp = wrap(m.tr("choice.inherit_help", m.scopeLabel(string(m.scope))), contentWidth)
+	}
+	compact := m.height < 24
+	visible := max(3, m.height-6)
+	if !compact {
+		visible = max(3, m.height-lipgloss.Height(description)-lipgloss.Height(inheritHelp)-8)
+	}
 	start := 0
 	if m.choice >= visible {
 		start = m.choice - visible + 1
@@ -1105,20 +1258,26 @@ func (m *Model) renderChoice() string {
 		}
 		label := m.optionLabel(m.editSpec.ID, option)
 		raw := option
-		if option == customChoice || raw == label {
+		if option == inheritChoice || option == customChoice || raw == label {
 			raw = ""
 		}
 		line := prefix + label
 		if raw != "" {
 			line += "  ·  " + raw
 		}
-		lines = append(lines, style.Width(max(1, m.modalContentWidth())).Render(
-			truncate(line, m.modalContentWidth()),
+		lines = append(lines, style.Width(max(1, contentWidth)).Render(
+			truncate(line, contentWidth),
 		))
 	}
-	body := wrap(m.specDescription(m.editSpec.ID, m.editSpec.Description), m.modalContentWidth()) + "\n\n" +
-		strings.Join(lines, "\n") + "\n\n" +
-		m.muted().Render(m.tr("choice.help"))
+	parts := []string{strings.Join(lines, "\n")}
+	if !compact {
+		parts = append([]string{description}, parts...)
+		if inheritHelp != "" {
+			parts = append(parts, m.muted().Render(inheritHelp))
+		}
+	}
+	parts = append(parts, m.muted().Render(m.tr("choice.help")))
+	body := strings.Join(parts, "\n\n")
 	return m.modal(m.specLabel(m.editSpec.ID, m.editSpec.Label), body, false)
 }
 
@@ -1192,7 +1351,7 @@ func (m *Model) modal(title, body string, dangerous bool) string {
 	width := m.modalWidth()
 	style := m.panelStyle(false)
 	if dangerous {
-		style = style.BorderForeground(m.color("#B45309", "#F59E0B"))
+		style = style.BorderForeground(m.color("#9A5200", "#EFA85A"))
 		title = m.warning().Bold(true).Render(title)
 	} else {
 		title = m.accent().Bold(true).Render(title)
@@ -1204,23 +1363,27 @@ func (m *Model) modal(title, body string, dangerous bool) string {
 }
 
 func (m *Model) panel(title, body string, width, height int, active bool) string {
-	titleStyle := m.muted().Bold(true)
+	titleStyle := m.text().Bold(true)
+	markerStyle := m.muted()
 	if active {
 		titleStyle = m.accent().Bold(true)
+		markerStyle = m.accent()
 	}
 	body = limitLines(body, max(0, height-4))
+	heading := markerStyle.Bold(true).Render("▌") + " " + titleStyle.Render(title)
+	rule := m.muted().Render(strings.Repeat("─", max(1, width-4)))
 	return m.panelStyle(active).
 		Width(max(4, width)).
 		Height(max(4, height)).
-		Render(titleStyle.Render(title) + "\n\n" + body)
+		Render(heading + "\n" + rule + "\n" + body)
 }
 
 func (m *Model) panelStyle(active bool) lipgloss.Style {
 	style := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
 	if active {
-		return style.BorderForeground(m.color("#006D77", "#22D3EE"))
+		return style.BorderForeground(m.color("#D97757", "#DA7756"))
 	}
-	return style.BorderForeground(m.color("#CBD5E1", "#475569"))
+	return style.BorderForeground(m.color("#C3C2B7", "#52514E"))
 }
 
 func (m *Model) inputStyle() lipgloss.Style {
@@ -1232,43 +1395,47 @@ func (m *Model) modalWidth() int {
 }
 
 func (m *Model) modalContentWidth() int {
-	return max(36, m.modalWidth()-4)
+	return max(36, m.modalWidth()-6)
 }
 
 func (m *Model) selectedStyle() lipgloss.Style {
-	style := m.style("#5B21B6", "#DDD6FE").Bold(true)
+	style := m.style("#8E3F29", "#FFF4EE").Bold(true)
 	if !m.noColor {
-		style = style.Background(m.color("#EDE9FE", "#4C1D95"))
+		style = style.Background(m.color("#FBF0DF", "#3A241E"))
 	}
 	return style
 }
 
 func (m *Model) scopeStyle() lipgloss.Style {
-	style := m.style("#0F766E", "#A5F3FC").Bold(true)
+	style := m.style("#8E3F29", "#FFF4EE").Bold(true)
 	if !m.noColor {
-		style = style.Background(m.color("#CCFBF1", "#164E63"))
+		style = style.Background(m.color("#F3D5C9", "#542D21"))
 	}
 	return style
 }
 
 func (m *Model) accent() lipgloss.Style {
-	return m.style("#006D77", "#67E8F9")
+	return m.style("#B5573B", "#DA7756")
+}
+
+func (m *Model) text() lipgloss.Style {
+	return m.style("#42392E", "#E7E6E1")
 }
 
 func (m *Model) muted() lipgloss.Style {
-	return m.style("#475569", "#94A3B8")
+	return m.style("#6B6761", "#898781")
 }
 
 func (m *Model) warning() lipgloss.Style {
-	return m.style("#B45309", "#FBBF24")
+	return m.style("#9A5200", "#EFA85A")
 }
 
 func (m *Model) danger() lipgloss.Style {
-	return m.style("#B91C1C", "#FB7185")
+	return m.style("#A63244", "#FF8888")
 }
 
 func (m *Model) success() lipgloss.Style {
-	return m.style("#047857", "#34D399")
+	return m.style("#006300", "#6FAF70")
 }
 
 func (m *Model) style(light, dark string) lipgloss.Style {
@@ -1331,6 +1498,30 @@ func wrap(text string, width int) string {
 		lines = append(lines, truncate(line, width))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func fitActionLines(actions []string, width int) []string {
+	if width <= 0 {
+		return nil
+	}
+	var lines []string
+	line := ""
+	for _, action := range actions {
+		candidate := action
+		if line != "" {
+			candidate = line + "  " + action
+		}
+		if line != "" && lipgloss.Width(candidate) > width {
+			lines = append(lines, line)
+			line = action
+			continue
+		}
+		line = candidate
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	return lines
 }
 
 func fitLines(lines []string, height int) string {

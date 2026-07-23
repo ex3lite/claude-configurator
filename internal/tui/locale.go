@@ -11,11 +11,12 @@ import (
 type uiLanguage string
 
 const (
-	languageAuto uiLanguage = "auto"
-	languageEN   uiLanguage = "en"
-	languageRU   uiLanguage = "ru"
-	languageZH   uiLanguage = "zh-CN"
-	customChoice            = "\x00custom"
+	languageAuto  uiLanguage = "auto"
+	languageEN    uiLanguage = "en"
+	languageRU    uiLanguage = "ru"
+	languageZH    uiLanguage = "zh-CN"
+	inheritChoice            = "\x00inherit"
+	customChoice             = "\x00custom"
 )
 
 type preferences struct {
@@ -111,6 +112,14 @@ func (m *Model) specDescription(id, fallback string) string {
 	return fallback
 }
 
+func (m *Model) specPurpose(id, fallback string) string {
+	key := "spec." + id + ".purpose"
+	if text := translations[m.language][key]; text != "" {
+		return text
+	}
+	return fallback
+}
+
 func (m *Model) categoryLabel(category string) string {
 	if text := translations[m.language]["category."+category]; text != "" {
 		return text
@@ -127,8 +136,14 @@ func (m *Model) scopeLabel(scope string) string {
 }
 
 func (m *Model) optionLabel(specID, option string) string {
+	if option == inheritChoice {
+		return m.tr("option.inherit")
+	}
 	if option == customChoice {
 		return m.tr("option.custom")
+	}
+	if specID == "theme" && strings.HasPrefix(option, "custom:") {
+		return m.tr("option.theme.custom", strings.TrimPrefix(option, "custom:"))
 	}
 	if text := translations[m.language]["option."+specID+"."+option]; text != "" {
 		return text
@@ -209,17 +224,27 @@ var translations = map[uiLanguage]map[string]string{
 		"category.Interface.description":   "Adjust Claude Code and Claude Configurator presentation.",
 		"category.Behavior.description":    "Tune memory, Git instructions, and the update channel.",
 
+		"option.inherit":                           "Default / inherit",
 		"option.custom":                            "Custom model ID…",
 		"option.default":                           "Default for account",
 		"option.best":                              "Best available",
+		"option.fable":                             "Fable 5 · recommended alias · 1M",
 		"option.sonnet":                            "Sonnet · latest",
 		"option.opus":                              "Opus · latest",
 		"option.haiku":                             "Haiku · latest",
 		"option.sonnet[1m]":                        "Sonnet · 1M context",
 		"option.opus[1m]":                          "Opus · 1M context",
 		"option.opusplan":                          "Opus Plan → Sonnet Build",
-		"option.claude-fable-5[1m]":                "Fable 5 · 1M",
-		"option.claude-sonnet-5":                   "Sonnet 5",
+		"option.claude-fable-5[1m]":                "Fable 5 · fixed ID · 1M",
+		"option.claude-sonnet-5":                   "Sonnet 5 · fixed ID",
+		"option.theme.auto":                        "Auto · follow terminal",
+		"option.theme.dark":                        "Dark",
+		"option.theme.light":                       "Light",
+		"option.theme.dark-daltonized":             "Dark · color-blind friendly",
+		"option.theme.light-daltonized":            "Light · color-blind friendly",
+		"option.theme.dark-ansi":                   "Dark · terminal ANSI colors",
+		"option.theme.light-ansi":                  "Light · terminal ANSI colors",
+		"option.theme.custom":                      "Custom theme · %s",
 		"option.ui-language.auto":                  "Auto · system language",
 		"option.ui-language.en":                    "English",
 		"option.ui-language.ru":                    "Русский",
@@ -229,8 +254,19 @@ var translations = map[uiLanguage]map[string]string{
 		"app.language.saved":                       "Interface language updated",
 		"app.language.save_failed":                 "Cannot save interface language: %s",
 		"header.staged":                            "● staged",
-		"footer.categories":                        "↑↓ choose category  Enter open  / search  g/p/l scope  ? help  q quit",
-		"footer.settings":                          "↑↓ navigate  Enter edit  Esc back  u inherit  s save  / search  ? help",
+		"header.subtitle":                          "Claude Code settings without hand-editing JSON",
+		"action.open":                              "Open",
+		"action.edit":                              "Change",
+		"action.inherit":                           "Reset to inherit",
+		"action.save":                              "Save",
+		"action.save_count":                        "Save · %d",
+		"action.search":                            "Search",
+		"action.scope":                             "Scope",
+		"action.help":                              "Keys",
+		"action.quit":                              "Quit",
+		"action.back":                              "Back",
+		"footer.hint.categories":                   "↑↓ choose a section · settings stay staged until you save",
+		"footer.hint.settings":                     "↑↓ choose · Space toggles · U removes this scope's value · ↳ means inherited",
 		"panel.categories":                         "MAIN MENU",
 		"panel.settings":                           "SETTINGS",
 		"panel.detail":                             "DETAIL",
@@ -245,6 +281,10 @@ var translations = map[uiLanguage]map[string]string{
 		"value.off":                                "Off",
 		"detail.this_scope":                        "THIS SCOPE",
 		"detail.effective":                         "EFFECTIVE",
+		"detail.what":                              "WHAT IT CONTROLS",
+		"detail.why":                               "WHY YOU MAY NEED IT",
+		"detail.key":                               "JSON key · %s",
+		"detail.inherit_hint":                      "No value is stored here. The effective value is inherited; Enter creates an override.",
 		"detail.source":                            "source: %s",
 		"detail.suggestions":                       "Choices: %s",
 		"detail.permissions_merge":                 "Permission arrays merge across scopes.",
@@ -255,6 +295,7 @@ var translations = map[uiLanguage]map[string]string{
 		"editor.edit":                              "Edit %s",
 		"editor.apply":                             "Enter apply · Esc cancel · ←→ move",
 		"choice.help":                              "↑↓ choose · Enter apply · Esc cancel",
+		"choice.inherit_help":                      "“Default / inherit” removes the key from the %s scope instead of writing a fake default value.",
 		"list.empty":                               "No values in this scope",
 		"list.help":                                "a add · Enter/e edit · d delete · Esc done",
 		"list.maximum":                             "Maximum: %d items",
@@ -312,17 +353,27 @@ var translations = map[uiLanguage]map[string]string{
 		"category.Interface.description":   "Внешний вид Claude Code и Claude Configurator.",
 		"category.Behavior.description":    "Память, Git-инструкции и канал обновлений.",
 
+		"option.inherit":                           "По умолчанию / наследовать",
 		"option.custom":                            "Другая модель…",
 		"option.default":                           "По умолчанию для аккаунта",
 		"option.best":                              "Лучшая доступная",
+		"option.fable":                             "Fable 5 · рекомендуемый алиас · 1M",
 		"option.sonnet":                            "Sonnet · последняя",
 		"option.opus":                              "Opus · последняя",
 		"option.haiku":                             "Haiku · последняя",
 		"option.sonnet[1m]":                        "Sonnet · контекст 1M",
 		"option.opus[1m]":                          "Opus · контекст 1M",
 		"option.opusplan":                          "Opus планирует → Sonnet пишет",
-		"option.claude-fable-5[1m]":                "Fable 5 · 1M",
-		"option.claude-sonnet-5":                   "Sonnet 5",
+		"option.claude-fable-5[1m]":                "Fable 5 · фиксированный ID · 1M",
+		"option.claude-sonnet-5":                   "Sonnet 5 · фиксированный ID",
+		"option.theme.auto":                        "Авто · как в терминале",
+		"option.theme.dark":                        "Тёмная",
+		"option.theme.light":                       "Светлая",
+		"option.theme.dark-daltonized":             "Тёмная · для дальтонизма",
+		"option.theme.light-daltonized":            "Светлая · для дальтонизма",
+		"option.theme.dark-ansi":                   "Тёмная · ANSI-цвета терминала",
+		"option.theme.light-ansi":                  "Светлая · ANSI-цвета терминала",
+		"option.theme.custom":                      "Своя тема · %s",
 		"option.ui-language.auto":                  "Авто · язык системы",
 		"option.ui-language.en":                    "English",
 		"option.ui-language.ru":                    "Русский",
@@ -332,8 +383,19 @@ var translations = map[uiLanguage]map[string]string{
 		"app.language.saved":                       "Язык интерфейса изменён",
 		"app.language.save_failed":                 "Не удалось сохранить язык интерфейса: %s",
 		"header.staged":                            "● изменено",
-		"footer.categories":                        "↑↓ выбрать раздел  Enter открыть  / поиск  g/p/l уровень  ? помощь  q выход",
-		"footer.settings":                          "↑↓ навигация  Enter изменить  Esc назад  u наследовать  s сохранить  / поиск",
+		"header.subtitle":                          "Настройки Claude Code без ручного редактирования JSON",
+		"action.open":                              "Открыть",
+		"action.edit":                              "Изменить",
+		"action.inherit":                           "Сбросить → наследовать",
+		"action.save":                              "Сохранить",
+		"action.save_count":                        "Сохранить · %d",
+		"action.search":                            "Поиск",
+		"action.scope":                             "Уровень",
+		"action.help":                              "Клавиши",
+		"action.quit":                              "Выход",
+		"action.back":                              "Назад",
+		"footer.hint.categories":                   "↑↓ выбрать раздел · изменения применятся только после сохранения",
+		"footer.hint.settings":                     "↑↓ выбрать · Space переключить · U удаляет значение этого уровня · ↳ означает наследование",
 		"panel.categories":                         "ГЛАВНОЕ МЕНЮ",
 		"panel.settings":                           "НАСТРОЙКИ",
 		"panel.detail":                             "ПОДРОБНОСТИ",
@@ -348,6 +410,10 @@ var translations = map[uiLanguage]map[string]string{
 		"value.off":                                "Выключено",
 		"detail.this_scope":                        "НА ЭТОМ УРОВНЕ",
 		"detail.effective":                         "ИТОГОВОЕ ЗНАЧЕНИЕ",
+		"detail.what":                              "ЧТО ЭТО МЕНЯЕТ",
+		"detail.why":                               "ЗАЧЕМ ЭТО НУЖНО",
+		"detail.key":                               "Ключ JSON · %s",
+		"detail.inherit_hint":                      "На этом уровне значение не записано. Используется наследуемое; Enter создаст переопределение.",
 		"detail.source":                            "источник: %s",
 		"detail.suggestions":                       "Варианты: %s",
 		"detail.permissions_merge":                 "Списки разрешений объединяются между уровнями.",
@@ -358,6 +424,7 @@ var translations = map[uiLanguage]map[string]string{
 		"editor.edit":                              "Изменить: %s",
 		"editor.apply":                             "Enter применить · Esc отменить · ←→ курсор",
 		"choice.help":                              "↑↓ выбрать · Enter применить · Esc отменить",
+		"choice.inherit_help":                      "«По умолчанию / наследовать» удаляет ключ с уровня «%s», а не записывает фиктивное значение.",
 		"list.empty":                               "На этом уровне значений нет",
 		"list.help":                                "a добавить · Enter/e изменить · d удалить · Esc готово",
 		"list.maximum":                             "Максимум: %d",
@@ -454,6 +521,36 @@ var translations = map[uiLanguage]map[string]string{
 		"spec.auto-memory.description":         "Разрешить Claude Code сохранять полезный контекст проекта.",
 		"spec.git-instructions.description":    "Добавлять встроенные инструкции рабочего процесса Git.",
 		"spec.updates.description":             "Канал автоматических обновлений Claude Code.",
+
+		"spec.main-model.purpose":          "Определяет баланс качества, скорости и стоимости в обычной работе без отдельного флага при каждом запуске.",
+		"spec.subagent-model.purpose":      "Позволяет оставить сильную модель в основном чате, а делегированные задачи отдать более быстрой модели — или всем агентам дать возможности Fable.",
+		"spec.advisor-model.purpose":       "Отделяет модель, которая проверяет сложное решение, от модели, выполняющей основную работу.",
+		"spec.fallback-models.purpose":     "Помогает продолжить работу, если основная модель не может обслужить запрос и Claude Code требуется разрешённая замена.",
+		"spec.effort.purpose":              "Низкие уровни быстрее и дешевле; высокие тратят больше рассуждений на сложные задачи.",
+		"spec.always-thinking.purpose":     "Повышает качество сложных рассуждений, если дополнительная задержка и расход токенов приемлемы.",
+		"spec.auto-compact.purpose":        "Не даёт длинной сессии упереться в лимит контекста, но итоговое резюме может потерять детали.",
+		"spec.agent-teams.purpose":         "Полезно, когда независимые части задачи можно выполнять параллельно; экспериментальное поведение ещё может меняться.",
+		"spec.teammate-mode.purpose":       "Оставьте агентов внутри процесса для простого терминала или вынесите в панели, чтобы наблюдать за каждым отдельно.",
+		"spec.agent-view.purpose":          "Отключайте только если интерфейс фоновых агентов мешает или несовместим с терминалом.",
+		"spec.permission-mode.purpose":     "Задаёт баланс скорости и безопасности: когда Claude обязан спросить разрешение перед действием.",
+		"spec.permission-allow.purpose":    "Убирает лишние подтверждения для команд и путей, которым вы уже доверяете.",
+		"spec.permission-ask.purpose":      "Оставляет чувствительные действия под ручным контролем, даже если более широкое правило их разрешает.",
+		"spec.permission-deny.purpose":     "Блокирует команды, инструменты и пути, к которым Claude не должен получать доступ.",
+		"spec.sandbox.purpose":             "Ограничивает ущерб от неожиданной shell-команды за счёт изоляции файловой системы и сети.",
+		"spec.sandbox-auto-allow.purpose":  "Ускоряет безопасные сценарии, не убирая границу изоляции.",
+		"spec.sandbox-unsandboxed.purpose": "Нужно только инструментам, которые не работают в изоляции; такие команды получают более широкий доступ к системе.",
+		"spec.checkpointing.purpose":       "Позволяет восстановить ошибочное изменение через /rewind, даже если Git-коммита ещё нет.",
+		"spec.ui-language.purpose":         "Режим «Авто» делает конфигуратор понятным на разных компьютерах без отдельной настройки языка.",
+		"spec.theme.purpose":               "Помогает сохранить читаемость на светлом или тёмном фоне и выбрать доступную либо терминальную палитру.",
+		"spec.tui.purpose":                 "Полноэкранный режим уменьшает мерцание; классический лучше совместим с обычным scrollback терминала.",
+		"spec.view.purpose":                "Убирает шум для сосредоточенной работы или показывает больше деталей при отладке поведения агентов.",
+		"spec.output-style.purpose":        "Меняет способ подачи ответа — кратко, объяснительно или учебно — без замены модели.",
+		"spec.editor-mode.purpose":         "Выбирайте Vim, если модальное редактирование соответствует вашей привычной навигации.",
+		"spec.language.purpose":            "Не приходится повторять требование к языку в каждом новом запросе.",
+		"spec.reduced-motion.purpose":      "Повышает доступность и делает медленные или удалённые терминалы спокойнее.",
+		"spec.auto-memory.purpose":         "Переносит полезные знания о проекте в следующие сессии без повторного объяснения.",
+		"spec.git-instructions.purpose":    "Оставьте включённым, если проект не заменяет встроенный Git-процесс собственными правилами.",
+		"spec.updates.purpose":             "Stable предсказуемее; latest раньше получает новые функции и исправления Claude Code.",
 	},
 	languageZH: {
 		"scope.global":  "全局",
@@ -475,17 +572,27 @@ var translations = map[uiLanguage]map[string]string{
 		"category.Interface.description":   "调整 Claude Code 和 Claude Configurator 的显示。",
 		"category.Behavior.description":    "设置记忆、Git 指令和更新频道。",
 
+		"option.inherit":                           "默认 / 继承",
 		"option.custom":                            "自定义模型 ID…",
 		"option.default":                           "账户默认",
 		"option.best":                              "最佳可用模型",
+		"option.fable":                             "Fable 5 · 推荐别名 · 1M",
 		"option.sonnet":                            "Sonnet · 最新",
 		"option.opus":                              "Opus · 最新",
 		"option.haiku":                             "Haiku · 最新",
 		"option.sonnet[1m]":                        "Sonnet · 1M 上下文",
 		"option.opus[1m]":                          "Opus · 1M 上下文",
 		"option.opusplan":                          "Opus 规划 → Sonnet 实现",
-		"option.claude-fable-5[1m]":                "Fable 5 · 1M",
-		"option.claude-sonnet-5":                   "Sonnet 5",
+		"option.claude-fable-5[1m]":                "Fable 5 · 固定 ID · 1M",
+		"option.claude-sonnet-5":                   "Sonnet 5 · 固定 ID",
+		"option.theme.auto":                        "自动 · 跟随终端",
+		"option.theme.dark":                        "深色",
+		"option.theme.light":                       "浅色",
+		"option.theme.dark-daltonized":             "深色 · 色觉友好",
+		"option.theme.light-daltonized":            "浅色 · 色觉友好",
+		"option.theme.dark-ansi":                   "深色 · 终端 ANSI 配色",
+		"option.theme.light-ansi":                  "浅色 · 终端 ANSI 配色",
+		"option.theme.custom":                      "自定义主题 · %s",
 		"option.ui-language.auto":                  "自动 · 系统语言",
 		"option.ui-language.en":                    "English",
 		"option.ui-language.ru":                    "Русский",
@@ -495,8 +602,19 @@ var translations = map[uiLanguage]map[string]string{
 		"app.language.saved":                       "界面语言已更新",
 		"app.language.save_failed":                 "无法保存界面语言：%s",
 		"header.staged":                            "● 已修改",
-		"footer.categories":                        "↑↓ 选择分类  Enter 打开  / 搜索  g/p/l 层级  ? 帮助  q 退出",
-		"footer.settings":                          "↑↓ 导航  Enter 编辑  Esc 返回  u 继承  s 保存  / 搜索",
+		"header.subtitle":                          "无需手动编辑 JSON 即可配置 Claude Code",
+		"action.open":                              "打开",
+		"action.edit":                              "修改",
+		"action.inherit":                           "重置并继承",
+		"action.save":                              "保存",
+		"action.save_count":                        "保存 · %d",
+		"action.search":                            "搜索",
+		"action.scope":                             "层级",
+		"action.help":                              "快捷键",
+		"action.quit":                              "退出",
+		"action.back":                              "返回",
+		"footer.hint.categories":                   "↑↓ 选择分类 · 所有更改会在保存前保持暂存",
+		"footer.hint.settings":                     "↑↓ 选择 · Space 切换 · U 删除当前层级值 · ↳ 表示继承",
 		"panel.categories":                         "主菜单",
 		"panel.settings":                           "设置",
 		"panel.detail":                             "详情",
@@ -511,6 +629,10 @@ var translations = map[uiLanguage]map[string]string{
 		"value.off":                                "关闭",
 		"detail.this_scope":                        "当前层级",
 		"detail.effective":                         "生效值",
+		"detail.what":                              "它控制什么",
+		"detail.why":                               "为什么需要它",
+		"detail.key":                               "JSON 键 · %s",
+		"detail.inherit_hint":                      "当前层级未保存值，正在使用继承结果；按 Enter 可创建覆盖值。",
 		"detail.source":                            "来源：%s",
 		"detail.suggestions":                       "选项：%s",
 		"detail.permissions_merge":                 "权限数组会跨层级合并。",
@@ -521,6 +643,7 @@ var translations = map[uiLanguage]map[string]string{
 		"editor.edit":                              "编辑 %s",
 		"editor.apply":                             "Enter 应用 · Esc 取消 · ←→ 移动",
 		"choice.help":                              "↑↓ 选择 · Enter 应用 · Esc 取消",
+		"choice.inherit_help":                      "“默认 / 继承”会删除“%s”层级中的键，而不是写入一个伪默认值。",
 		"list.empty":                               "当前层级没有值",
 		"list.help":                                "a 添加 · Enter/e 编辑 · d 删除 · Esc 完成",
 		"list.maximum":                             "最多：%d 项",
@@ -617,5 +740,35 @@ var translations = map[uiLanguage]map[string]string{
 		"spec.auto-memory.description":         "允许 Claude Code 自动保存有用的项目上下文。",
 		"spec.git-instructions.description":    "包含 Claude Code 内置的 Git 工作流说明。",
 		"spec.updates.description":             "Claude Code 自动更新频道。",
+
+		"spec.main-model.purpose":          "决定日常工作的能力、速度和成本，无需每次启动都传入模型参数。",
+		"spec.subagent-model.purpose":      "主会话可以保留更强模型，同时让委派任务使用更快模型；也可以让所有代理使用 Fable 级能力。",
+		"spec.advisor-model.purpose":       "将审查困难决策的模型与执行主要工作的模型分开。",
+		"spec.fallback-models.purpose":     "首选模型无法处理请求时，让 Claude Code 改用另一个获准模型继续工作。",
+		"spec.effort.purpose":              "较低级别更快、更省；较高级别会为复杂任务投入更多推理。",
+		"spec.always-thinking.purpose":     "在可以接受额外延迟和令牌消耗时，提高复杂推理质量。",
+		"spec.auto-compact.purpose":        "避免长会话触及上下文上限，但压缩摘要可能遗漏细节。",
+		"spec.agent-teams.purpose":         "适合并行处理相互独立的任务部分；实验性行为仍可能变化。",
+		"spec.teammate-mode.purpose":       "简单终端可使用进程内显示；需要分别观察代理时可使用独立面板。",
+		"spec.agent-view.purpose":          "仅当后台代理界面造成干扰或与终端不兼容时关闭。",
+		"spec.permission-mode.purpose":     "在效率与安全之间取舍，决定 Claude 执行动作前何时必须询问。",
+		"spec.permission-allow.purpose":    "对已经信任的命令和路径减少重复确认。",
+		"spec.permission-ask.purpose":      "即使更宽泛的规则允许，也让敏感动作始终由你确认。",
+		"spec.permission-deny.purpose":     "阻止 Claude 访问绝不应使用的命令、工具或路径。",
+		"spec.sandbox.purpose":             "通过隔离文件系统和网络，限制意外 shell 命令可能造成的损害。",
+		"spec.sandbox-auto-allow.purpose":  "在不移除隔离边界的前提下加快安全工作流。",
+		"spec.sandbox-unsandboxed.purpose": "只适用于无法在隔离环境中工作的工具；这些命令会获得更广泛的系统访问。",
+		"spec.checkpointing.purpose":       "即使尚未创建 Git 提交，也能通过 /rewind 恢复错误编辑。",
+		"spec.ui-language.purpose":         "自动模式会跟随不同电脑的系统语言，无需单独维护界面语言。",
+		"spec.theme.purpose":               "在明暗背景下保持可读性，并可选择色觉友好或终端原生配色。",
+		"spec.tui.purpose":                 "全屏模式减少闪烁；经典模式更兼容终端原生回滚记录。",
+		"spec.view.purpose":                "专注工作时减少噪音，调试代理行为时显示更多细节。",
+		"spec.output-style.purpose":        "无需更换模型，即可选择简洁、解释型或学习型的回答方式。",
+		"spec.editor-mode.purpose":         "如果你习惯 Vim 的模态导航，可选择 Vim 模式。",
+		"spec.language.purpose":            "无需在每个新提示中重复指定回复语言。",
+		"spec.reduced-motion.purpose":      "提升可访问性，并让较慢或远程终端更平静。",
+		"spec.auto-memory.purpose":         "把有用的项目知识带到后续会话，无需重复说明。",
+		"spec.git-instructions.purpose":    "如果项目没有自己的 Git 工作流规则，建议保持开启。",
+		"spec.updates.purpose":             "stable 更可预测；latest 更早获得 Claude Code 新功能和修复。",
 	},
 }

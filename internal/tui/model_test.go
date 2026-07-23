@@ -112,6 +112,20 @@ func TestResponsiveRendering(t *testing.T) {
 	}
 }
 
+func TestStagedActionBarFitsNarrowTerminal(t *testing.T) {
+	m := testModelWithSystemLanguage(t, "ru_RU.UTF-8")
+	config.Set(m.drafts[config.Global], "model", "fable")
+	for _, size := range [][2]int{{76, 24}, {60, 20}, {52, 18}} {
+		m.width, m.height = size[0], size[1]
+		content := m.View().Content
+		for _, line := range strings.Split(content, "\n") {
+			if width := lipgloss.Width(line); width > size[0] {
+				t.Fatalf("%dx%d staged view has a %d-column line: %q", size[0], size[1], width, line)
+			}
+		}
+	}
+}
+
 func TestPanelUsesRequestedDimensions(t *testing.T) {
 	m := testModel(t)
 	m.noColor = true
@@ -192,7 +206,9 @@ func TestModelUsesChoicePickerAndExplicitCustomOption(t *testing.T) {
 	if m.screen != editChoice {
 		t.Fatalf("model editor screen = %v, want editChoice", m.screen)
 	}
-	if !slices.Contains(m.choiceOptions(), "sonnet") ||
+	if m.choiceOptions()[0] != inheritChoice ||
+		!slices.Contains(m.choiceOptions(), "fable") ||
+		!slices.Contains(m.choiceOptions(), "sonnet") ||
 		!slices.Contains(m.choiceOptions(), "claude-fable-5[1m]") {
 		t.Fatalf("model options = %#v", m.choiceOptions())
 	}
@@ -204,6 +220,115 @@ func TestModelUsesChoicePickerAndExplicitCustomOption(t *testing.T) {
 	press(m, special(tea.KeyEnter))
 	if m.screen != editText {
 		t.Fatalf("custom model screen = %v, want editText", m.screen)
+	}
+}
+
+func TestSubagentPickerCanResetToInheritanceAndSelectFable(t *testing.T) {
+	m := testModel(t)
+	m.focus = 1
+	m.selected = 1
+	config.Set(m.drafts[config.Global], "env.CLAUDE_CODE_SUBAGENT_MODEL", "sonnet")
+
+	press(m, special(tea.KeyEnter))
+	if m.screen != editChoice {
+		t.Fatalf("subagent editor screen = %v, want editChoice", m.screen)
+	}
+	if m.choiceOptions()[0] != inheritChoice || !slices.Contains(m.choiceOptions(), "fable") {
+		t.Fatalf("subagent options = %#v", m.choiceOptions())
+	}
+	selectChoice(t, m, inheritChoice)
+	press(m, special(tea.KeyEnter))
+	if _, ok := config.Get(m.drafts[config.Global], "env.CLAUDE_CODE_SUBAGENT_MODEL"); ok {
+		t.Fatal("default/inherit choice did not remove the scoped value")
+	}
+
+	press(m, special(tea.KeyEnter))
+	selectChoice(t, m, "fable")
+	press(m, special(tea.KeyEnter))
+	if got, _ := config.Get(m.drafts[config.Global], "env.CLAUDE_CODE_SUBAGENT_MODEL"); got != "fable" {
+		t.Fatalf("staged subagent model = %v, want fable", got)
+	}
+}
+
+func TestThemeUsesBuiltInChoicePicker(t *testing.T) {
+	m := testModel(t)
+	themeDir := filepath.Join(filepath.Dir(m.workspace.Paths.Global), "themes")
+	if err := os.MkdirAll(themeDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(themeDir, "dracula.json"), []byte(`{"base":"dark"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m.category = 5 // Interface
+	m.focus = 1
+	for i, spec := range m.visibleSpecs() {
+		if spec.ID == "theme" {
+			m.selected = i
+			break
+		}
+	}
+	press(m, special(tea.KeyEnter))
+	if m.screen != editChoice {
+		t.Fatalf("theme editor screen = %v, want editChoice", m.screen)
+	}
+	for _, option := range []string{inheritChoice, "auto", "dark", "light", "dark-daltonized", "light-ansi", "custom:dracula"} {
+		if !slices.Contains(m.choiceOptions(), option) {
+			t.Fatalf("theme options missing %q: %#v", option, m.choiceOptions())
+		}
+	}
+	if slices.Contains(m.choiceOptions(), customChoice) {
+		t.Fatalf("theme unexpectedly requires manual input: %#v", m.choiceOptions())
+	}
+	selectChoice(t, m, "dark")
+	press(m, special(tea.KeyEnter))
+	if got, _ := config.Get(m.drafts[config.Global], "theme"); got != "dark" {
+		t.Fatalf("staged theme = %v, want dark", got)
+	}
+}
+
+func TestFooterAlwaysShowsActionsAlongsideStatus(t *testing.T) {
+	m := testModelWithSystemLanguage(t, "ru_RU.UTF-8")
+	m.noColor = true
+	m.status = "Проверочный статус"
+	content := m.View().Content
+	for _, text := range []string{"Сохранить", "Клавиши", "Проверочный статус"} {
+		if !strings.Contains(content, text) {
+			t.Fatalf("footer missing %q: %q", text, content)
+		}
+	}
+
+	m.focus = 1
+	content = m.View().Content
+	for _, text := range []string{"Изменить", "Сбросить → наследовать", "Назад"} {
+		if !strings.Contains(content, text) {
+			t.Fatalf("settings footer missing %q: %q", text, content)
+		}
+	}
+}
+
+func TestDetailExplainsPurposeAndReset(t *testing.T) {
+	m := testModelWithSystemLanguage(t, "ru_RU.UTF-8")
+	m.noColor = true
+	m.focus = 1
+	config.Set(m.drafts[config.Global], "model", "fable")
+	content := m.renderDetail(64)
+	for _, text := range []string{"ЧТО ЭТО МЕНЯЕТ", "ЗАЧЕМ ЭТО НУЖНО", "Сбросить → наследовать"} {
+		if !strings.Contains(content, text) {
+			t.Fatalf("detail missing %q: %q", text, content)
+		}
+	}
+}
+
+func TestEverySettingHasLocalizedPurpose(t *testing.T) {
+	for _, spec := range catalog.Specs {
+		if spec.Purpose == "" {
+			t.Errorf("%s has no English purpose", spec.ID)
+		}
+		for _, language := range []uiLanguage{languageRU, languageZH} {
+			if translations[language]["spec."+spec.ID+".purpose"] == "" {
+				t.Errorf("%s has no %s purpose", spec.ID, language)
+			}
+		}
 	}
 }
 

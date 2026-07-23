@@ -1,89 +1,85 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
-  <title id="title">Claude Configurator model picker</title>
-  <desc id="desc">A dark terminal interface with scope controls, hierarchical navigation, and a model picker containing Claude aliases and custom model presets.</desc>
+  <title id="title">Claude Configurator settings screen</title>
+  <desc id="desc">A warm dark terminal interface inspired by Claude Code, showing model settings, inheritance controls, explanations, and a persistent save action.</desc>
   <defs>
-    <linearGradient id="shell" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#07101e"/>
-      <stop offset="1" stop-color="#080712"/>
-    </linearGradient>
-    <linearGradient id="selected" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#4c1d95"/>
-      <stop offset="1" stop-color="#312e81"/>
-    </linearGradient>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#020617" flood-opacity=".8"/>
+      <feDropShadow dx="0" dy="20" stdDeviation="28" flood-color="#080706" flood-opacity=".72"/>
     </filter>
   </defs>
 
-  <rect width="1200" height="720" rx="24" fill="url(#shell)"/>
-  <rect x="1" y="1" width="1198" height="718" rx="23" fill="none" stroke="#26344d" stroke-width="2"/>
-  <circle cx="32" cy="29" r="7" fill="#fb7185"/>
-  <circle cx="56" cy="29" r="7" fill="#fbbf24"/>
-  <circle cx="80" cy="29" r="7" fill="#34d399"/>
+  <rect width="1200" height="720" rx="24" fill="#141413"/>
+  <rect x="1" y="1" width="1198" height="718" rx="23" fill="none" stroke="#383835" stroke-width="2"/>
+  <circle cx="32" cy="29" r="7" fill="#a63244"/>
+  <circle cx="56" cy="29" r="7" fill="#d49a52"/>
+  <circle cx="80" cy="29" r="7" fill="#6faf70"/>
 
   <g font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace">
-    <text x="28" y="75" fill="#67e8f9" font-size="21" font-weight="700">◆ CLAUDE CONFIG</text>
-    <text x="245" y="75" fill="#64748b" font-size="16">v0.2.0</text>
-    <text x="1170" y="75" fill="#64748b" font-size="15" text-anchor="end">~/.claude/settings.json</text>
+    <text x="30" y="72" fill="#da7756" font-size="24" font-weight="700">✻  CLAUDE CONFIGURATOR</text>
+    <text x="356" y="72" fill="#898781" font-size="15">v0.3.0</text>
+    <text x="30" y="101" fill="#898781" font-size="14">Claude Code settings without hand-editing JSON</text>
+    <text x="1170" y="101" fill="#898781" font-size="14" text-anchor="end">~/.claude/settings.json</text>
 
-    <rect x="27" y="91" width="116" height="31" rx="6" fill="#164e63"/>
-    <text x="42" y="112" fill="#a5f3fc" font-size="15" font-weight="700">G  GLOBAL</text>
-    <text x="162" y="112" fill="#64748b" font-size="15">P  PROJECT</text>
-    <text x="284" y="112" fill="#64748b" font-size="15">L  LOCAL</text>
-    <text x="1170" y="112" fill="#c4b5fd" font-size="15" text-anchor="end">Main menu  /  Models</text>
-    <line x1="26" y1="135" x2="1174" y2="135" stroke="#334155"/>
-
-    <g opacity=".34">
-      <rect x="26" y="154" width="424" height="490" rx="11" fill="#0b1222" stroke="#22d3ee" stroke-width="2"/>
-      <rect x="470" y="154" width="704" height="490" rx="11" fill="#0b1222" stroke="#334155" stroke-width="2"/>
-      <text x="47" y="185" fill="#67e8f9" font-size="14" font-weight="700">SETTINGS</text>
-      <text x="491" y="185" fill="#94a3b8" font-size="14" font-weight="700">DETAIL</text>
-      <rect x="41" y="204" width="394" height="38" rx="5" fill="#4c1d95"/>
-      <text x="54" y="228" fill="#f5f3ff" font-size="16">› Main model</text>
-      <text x="420" y="228" fill="#f5f3ff" font-size="15" text-anchor="end">Fable 5 · 1M</text>
-      <text x="54" y="274" fill="#94a3b8" font-size="16">  Subagent model</text>
-      <text x="420" y="274" fill="#94a3b8" font-size="15" text-anchor="end">Sonnet 5</text>
-      <text x="493" y="227" fill="#67e8f9" font-size="21" font-weight="700">Main model</text>
-      <text x="493" y="257" fill="#64748b" font-size="15">model</text>
-    </g>
+    <rect x="28" y="119" width="116" height="29" rx="5" fill="#542d21"/>
+    <text x="42" y="139" fill="#fff4ee" font-size="14" font-weight="700">G  GLOBAL</text>
+    <text x="164" y="139" fill="#898781" font-size="14">P  PROJECT</text>
+    <text x="286" y="139" fill="#898781" font-size="14">L  LOCAL</text>
+    <text x="1170" y="139" fill="#da7756" font-size="14" font-weight="700" text-anchor="end">Main menu  /  Models</text>
+    <line x1="27" y1="160" x2="1173" y2="160" stroke="#52514e"/>
 
     <g filter="url(#shadow)">
-      <rect x="192" y="143" width="816" height="522" rx="14" fill="#0b1222" stroke="#22d3ee" stroke-width="2"/>
-      <text x="222" y="181" fill="#67e8f9" font-size="22" font-weight="700">Main model</text>
-      <text x="222" y="211" fill="#94a3b8" font-size="15">Choose an alias that follows your provider, a pinned preset, or an explicit custom ID.</text>
-
-      <g font-size="15">
-        <text x="237" y="250" fill="#94a3b8">Default for account</text>
-        <text x="965" y="250" fill="#64748b" text-anchor="end">default</text>
-        <text x="237" y="283" fill="#94a3b8">Best available</text>
-        <text x="965" y="283" fill="#64748b" text-anchor="end">best</text>
-        <text x="237" y="316" fill="#94a3b8">Sonnet · latest</text>
-        <text x="965" y="316" fill="#64748b" text-anchor="end">sonnet</text>
-        <text x="237" y="349" fill="#94a3b8">Opus · latest</text>
-        <text x="965" y="349" fill="#64748b" text-anchor="end">opus</text>
-        <text x="237" y="382" fill="#94a3b8">Haiku · latest</text>
-        <text x="965" y="382" fill="#64748b" text-anchor="end">haiku</text>
-        <text x="237" y="415" fill="#94a3b8">Sonnet · 1M context</text>
-        <text x="965" y="415" fill="#64748b" text-anchor="end">sonnet[1m]</text>
-        <text x="237" y="448" fill="#94a3b8">Opus · 1M context</text>
-        <text x="965" y="448" fill="#64748b" text-anchor="end">opus[1m]</text>
-        <text x="237" y="481" fill="#94a3b8">Opus Plan → Sonnet Build</text>
-        <text x="965" y="481" fill="#64748b" text-anchor="end">opusplan</text>
-
-        <rect x="212" y="496" width="776" height="38" rx="6" fill="url(#selected)"/>
-        <rect x="212" y="496" width="4" height="38" rx="2" fill="#67e8f9"/>
-        <text x="229" y="521" fill="#f5f3ff" font-weight="700">› Fable 5 · 1M</text>
-        <text x="965" y="521" fill="#ddd6fe" text-anchor="end">claude-fable-5[1m]</text>
-
-        <text x="237" y="559" fill="#94a3b8">Sonnet 5</text>
-        <text x="965" y="559" fill="#64748b" text-anchor="end">claude-sonnet-5</text>
-        <text x="237" y="592" fill="#c4b5fd">Custom model ID…</text>
-      </g>
-
-      <line x1="217" y1="615" x2="983" y2="615" stroke="#243147"/>
-      <text x="222" y="641" fill="#64748b" font-size="14">↑↓ choose   Enter apply   Esc cancel</text>
+      <rect x="27" y="181" width="410" height="446" rx="11" fill="#1a1a19" stroke="#da7756" stroke-width="2"/>
+      <rect x="453" y="181" width="720" height="446" rx="11" fill="#1a1a19" stroke="#52514e" stroke-width="2"/>
     </g>
 
-    <text x="28" y="692" fill="#64748b" font-size="14">↑↓ navigate   Enter edit   Esc back   u inherit   s save   / search   ? help</text>
+    <text x="47" y="211" fill="#da7756" font-size="16" font-weight="700">▌  SETTINGS</text>
+    <line x1="47" y1="227" x2="417" y2="227" stroke="#52514e"/>
+
+    <g font-size="15">
+      <text x="52" y="262" fill="#e7e6e1">  Main model</text>
+      <text x="415" y="262" fill="#898781" text-anchor="end">Fable 5 · 1M</text>
+
+      <rect x="41" y="278" width="382" height="37" rx="5" fill="#3a241e"/>
+      <rect x="41" y="278" width="4" height="37" rx="2" fill="#da7756"/>
+      <text x="52" y="302" fill="#fff4ee" font-weight="700">› Subagent model</text>
+      <text x="415" y="302" fill="#fff4ee" font-weight="700" text-anchor="end">Sonnet 5</text>
+
+      <text x="52" y="342" fill="#e7e6e1">  Advisor model</text>
+      <text x="415" y="342" fill="#898781" text-anchor="end">Inherit  ↳</text>
+      <text x="52" y="382" fill="#e7e6e1">  Fallback models</text>
+      <text x="415" y="382" fill="#898781" text-anchor="end">Inherit  ↳</text>
+    </g>
+
+    <text x="475" y="211" fill="#898781" font-size="16" font-weight="700">▌  DETAIL</text>
+    <line x1="475" y1="227" x2="1151" y2="227" stroke="#52514e"/>
+
+    <text x="478" y="262" fill="#da7756" font-size="22" font-weight="700">▌</text>
+    <text x="505" y="262" fill="#e7e6e1" font-size="20" font-weight="700">Subagent model</text>
+    <text x="478" y="292" fill="#898781" font-size="13">JSON key · env.CLAUDE_CODE_SUBAGENT_MODEL</text>
+
+    <text x="478" y="330" fill="#898781" font-size="13" font-weight="700">THIS SCOPE</text>
+    <text x="478" y="356" fill="#e7e6e1" font-size="17" font-weight="700">Sonnet 5 · fixed ID</text>
+    <text x="478" y="386" fill="#da7756" font-size="14" font-weight="700">[U]</text>
+    <text x="512" y="386" fill="#e7e6e1" font-size="14">Reset to inherit</text>
+
+    <text x="478" y="425" fill="#898781" font-size="13" font-weight="700">EFFECTIVE VALUE</text>
+    <text x="478" y="451" fill="#e7e6e1" font-size="17" font-weight="700">Sonnet 5 · fixed ID</text>
+    <text x="478" y="474" fill="#898781" font-size="13">source: Global</text>
+
+    <text x="478" y="513" fill="#898781" font-size="13" font-weight="700">WHAT IT CONTROLS</text>
+    <text x="478" y="540" fill="#e7e6e1" font-size="14">Model used by all subagents, agent teams, and workflow agents.</text>
+    <text x="478" y="561" fill="#e7e6e1" font-size="14">It overrides model choices made by individual agents.</text>
+
+    <text x="478" y="597" fill="#898781" font-size="13" font-weight="700">WHY YOU MAY NEED IT</text>
+    <text x="478" y="620" fill="#e7e6e1" font-size="14">Keep the main session powerful while delegated work uses a faster model.</text>
+
+    <rect x="27" y="654" width="167" height="34" rx="5" fill="#da7756"/>
+    <text x="42" y="676" fill="#1a1412" font-size="14" font-weight="700">[S] SAVE · 2</text>
+    <text x="215" y="676" fill="#da7756" font-size="14" font-weight="700">[ENTER]</text>
+    <text x="282" y="676" fill="#e7e6e1" font-size="14">Change</text>
+    <text x="360" y="676" fill="#da7756" font-size="14" font-weight="700">[U]</text>
+    <text x="393" y="676" fill="#e7e6e1" font-size="14">Reset to inherit</text>
+    <text x="560" y="676" fill="#da7756" font-size="14" font-weight="700">[ESC]</text>
+    <text x="611" y="676" fill="#e7e6e1" font-size="14">Back</text>
+    <text x="1170" y="676" fill="#898781" font-size="13" text-anchor="end">● staged   ↳ inherited</text>
   </g>
 </svg>

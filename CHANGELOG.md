@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.0 — 2026-07-23
+
+- Reworked the TUI around Claude Code's warm clay palette with clearer
+  title/subtitle hierarchy and responsive spacing.
+- Added persistent Save and hotkey actions; status messages no longer hide the
+  controls.
+- Added explicit **Default / inherit** choices and visible reset actions that
+  remove the current scope's key.
+- Added the current `fable` alias to every model picker, including subagents.
+- Replaced manual theme input with built-in and discovered custom-theme
+  pickers.
+- Added localized “what it controls / why you may need it” explanations for
+  every setting.
+
 ## v0.2.0 — 2026-07-23
 
 - Hierarchical main menu: Enter opens a category; Esc or Left returns.

@@ -17,9 +17,14 @@ anywhere.
 - Global, shared project, and local project scopes.
 - Pickers for main, subagent, advisor, and fallback models; no raw typing for
   normal model selection.
+- Current `fable`, `best`, `sonnet`, `opus`, and `haiku` aliases, plus an
+  explicit **Default / inherit** action in every scoped picker.
 - Reasoning, agents, permissions, sandbox, interface, and behavior settings.
 - Auto-localized TUI in English, Russian, or Simplified Chinese.
-- Search, inherited-value/source display, staged changes, and diff before save.
+- Claude Code-inspired warm palette, clear title/subtitle hierarchy, and
+  plain-language “what it controls / why you may need it” explanations.
+- Persistent action bar with Save, hotkeys, inherited-value/source display,
+  staged changes, and diff before save.
 - Conflict detection, automatic backups, and protection against invalid JSON.
 - Git repository and worktree-aware paths.
 - One native binary for macOS, Linux, and Windows.
@@ -91,11 +96,30 @@ subagent setting applies to all subagents, agent teams, and workflow agents,
 and overrides per-agent model choices. Restart already-running Claude Code
 sessions after saving.
 
-The picker includes Claude Code's stable `default`, `best`, `sonnet`, `opus`,
-`haiku`, 1M-context, and `opusplan` aliases. **Custom model ID…** remains the
-last explicit option for gateways and provider-specific deployments; ordinary
-model selection never opens a string field. See the
+The picker includes Claude Code's current `default`, `best`, `fable`, `sonnet`,
+`opus`, `haiku`, 1M-context, and `opusplan` aliases. Fable appears both as the
+recommended `fable` alias and as a pinned preset. **Custom model ID…** remains
+the last explicit option for gateways and provider-specific deployments;
+ordinary model selection never opens a string field. See the
 [official model configuration](https://code.claude.com/docs/en/model-config).
+
+### Inheritance, reset, and save
+
+The first item in a scoped picker is **Default / inherit**. It removes that
+JSON key from the selected scope, so the value falls back to project, global,
+managed, or Claude's own default resolution. It does not write a fake string.
+The same action is always visible as **[U] Reset to inherit** in the details
+panel and action bar.
+
+Changes remain staged until **[S] Save**. Save is always visible, shows the
+number of changed settings, and opens a diff before writing the file.
+
+### Claude Code theme
+
+Open **Interface → Theme** to choose Auto, dark, light, daltonized, or terminal
+ANSI themes from a picker. Existing custom themes from `~/.claude/themes/*.json`
+are added to the same list automatically; theme selection does not require
+typing a string.
 
 ### Interface language
 
@@ -114,7 +138,7 @@ directory for Claude Configurator and is not written to Claude Code settings.
 | `g`, `p`, `l` | Global, project, local scope |
 | `Space` | Toggle a boolean |
 | `/` | Search |
-| `u` | Unset and inherit |
+| `u` | Remove this scope's value and inherit |
 | `s` | Review diff and save |
 | `r` | Reload from disk |
 | `?` | Help |
