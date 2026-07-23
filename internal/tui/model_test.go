@@ -3,6 +3,7 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -10,20 +11,22 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/ex3lite/claude-configurator/internal/catalog"
 	"github.com/ex3lite/claude-configurator/internal/config"
 )
 
 func TestStageAndSaveModel(t *testing.T) {
 	m := testModel(t)
 	press(m, special(tea.KeyEnter))
-	typeText(m, "claude-fable-5[1m]")
+	press(m, special(tea.KeyEnter))
+	selectChoice(t, m, "claude-fable-5[1m]")
 	press(m, special(tea.KeyEnter))
 	if got, _ := config.Get(m.drafts[config.Global], "model"); got != "claude-fable-5[1m]" {
 		t.Fatalf("staged model = %v", got)
 	}
 	press(m, textKey("j"))
 	press(m, special(tea.KeyEnter))
-	typeText(m, "claude-sonnet-5")
+	selectChoice(t, m, "claude-sonnet-5")
 	press(m, special(tea.KeyEnter))
 	if got, _ := config.Get(m.drafts[config.Global], "env.CLAUDE_CODE_SUBAGENT_MODEL"); got != "claude-sonnet-5" {
 		t.Fatalf("staged subagent model = %v", got)
@@ -54,6 +57,7 @@ func TestStageAndSaveModel(t *testing.T) {
 func TestDangerousToggleRequiresConfirmation(t *testing.T) {
 	m := testModel(t)
 	m.category = 4 // Safety
+	m.focus = 1
 	m.selected = 0 // sandbox.enabled
 	press(m, textKey(" "))
 	if m.screen != browse {
@@ -91,7 +95,7 @@ func TestScopeSearchAndUnset(t *testing.T) {
 
 func TestResponsiveRendering(t *testing.T) {
 	m := testModel(t)
-	for _, size := range [][2]int{{120, 30}, {90, 25}, {60, 20}, {40, 10}} {
+	for _, size := range [][2]int{{120, 30}, {90, 25}, {60, 20}, {48, 12}, {40, 10}} {
 		m.width, m.height = size[0], size[1]
 		content := m.View().Content
 		if !strings.Contains(content, "Claude") && !strings.Contains(content, "CLAUDE") {
@@ -100,6 +104,23 @@ func TestResponsiveRendering(t *testing.T) {
 		if got := len(strings.Split(content, "\n")); got > size[1] {
 			t.Fatalf("%dx%d rendered %d lines", size[0], size[1], got)
 		}
+		for _, line := range strings.Split(content, "\n") {
+			if width := lipgloss.Width(line); width > size[0] {
+				t.Fatalf("%dx%d rendered a %d-column line: %q", size[0], size[1], width, line)
+			}
+		}
+	}
+}
+
+func TestPanelUsesRequestedDimensions(t *testing.T) {
+	m := testModel(t)
+	m.noColor = true
+	panel := m.panel("TITLE", "body", 25, 18, true)
+	if width := lipgloss.Width(panel); width != 25 {
+		t.Fatalf("panel width = %d, want 25", width)
+	}
+	if height := lipgloss.Height(panel); height != 18 {
+		t.Fatalf("panel height = %d, want 18", height)
 	}
 }
 
@@ -112,10 +133,27 @@ func TestNoColorRendering(t *testing.T) {
 	}
 }
 
+func TestLocalizedRenderingFitsTerminal(t *testing.T) {
+	for _, language := range []string{"ru_RU.UTF-8", "zh_CN.UTF-8"} {
+		t.Run(language, func(t *testing.T) {
+			m := testModelWithSystemLanguage(t, language)
+			for _, size := range [][2]int{{120, 30}, {90, 25}, {64, 24}, {52, 18}} {
+				m.width, m.height = size[0], size[1]
+				for _, line := range strings.Split(m.View().Content, "\n") {
+					if width := lipgloss.Width(line); width > size[0] {
+						t.Fatalf("%dx%d rendered a %d-column line: %q", size[0], size[1], width, line)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestEditorFitsEightyColumns(t *testing.T) {
 	m := testModel(t)
 	m.noColor = true
 	m.width, m.height = 80, 24
+	press(m, special(tea.KeyEnter))
 	press(m, special(tea.KeyEnter))
 	for _, line := range strings.Split(m.View().Content, "\n") {
 		if width := lipgloss.Width(line); width > m.width {
@@ -124,11 +162,147 @@ func TestEditorFitsEightyColumns(t *testing.T) {
 	}
 }
 
+func TestNavigationDrillsIntoCategory(t *testing.T) {
+	m := testModel(t)
+	if m.focus != 0 {
+		t.Fatalf("initial focus = %d, want main menu", m.focus)
+	}
+	press(m, special(tea.KeyRight))
+	if m.focus != 0 || m.category != 0 {
+		t.Fatal("right arrow changed the main menu selection")
+	}
+	press(m, special(tea.KeyDown))
+	if m.category != 1 {
+		t.Fatalf("category = %d, want 1", m.category)
+	}
+	press(m, special(tea.KeyEnter))
+	if m.focus != 1 {
+		t.Fatal("Enter did not open the selected category")
+	}
+	press(m, special(tea.KeyLeft))
+	if m.focus != 0 || m.category != 1 {
+		t.Fatal("left arrow did not return to the same main-menu category")
+	}
+}
+
+func TestModelUsesChoicePickerAndExplicitCustomOption(t *testing.T) {
+	m := testModel(t)
+	press(m, special(tea.KeyEnter))
+	press(m, special(tea.KeyEnter))
+	if m.screen != editChoice {
+		t.Fatalf("model editor screen = %v, want editChoice", m.screen)
+	}
+	if !slices.Contains(m.choiceOptions(), "sonnet") ||
+		!slices.Contains(m.choiceOptions(), "claude-fable-5[1m]") {
+		t.Fatalf("model options = %#v", m.choiceOptions())
+	}
+	selectChoice(t, m, customChoice)
+	m.width, m.height = 52, 18
+	if content := m.View().Content; !strings.Contains(content, "Custom model ID") {
+		t.Fatalf("selected custom option is hidden in a small terminal: %q", content)
+	}
+	press(m, special(tea.KeyEnter))
+	if m.screen != editText {
+		t.Fatalf("custom model screen = %v, want editText", m.screen)
+	}
+}
+
+func TestFallbackModelsUseChoicePicker(t *testing.T) {
+	m := testModel(t)
+	m.focus = 1
+	m.selected = 3
+	press(m, special(tea.KeyEnter))
+	if m.screen != editList {
+		t.Fatalf("fallback editor screen = %v, want editList", m.screen)
+	}
+	press(m, textKey("a"))
+	if m.screen != editChoice {
+		t.Fatalf("fallback add screen = %v, want editChoice", m.screen)
+	}
+	selectChoice(t, m, "sonnet")
+	press(m, special(tea.KeyEnter))
+	items := m.ownList(m.editSpec)
+	if len(items) != 1 || items[0] != "sonnet" {
+		t.Fatalf("fallback models = %#v", items)
+	}
+}
+
+func TestExistingProviderModelOpensAsCustom(t *testing.T) {
+	m := testModel(t)
+	m.focus = 1
+	config.Set(m.drafts[config.Global], "model", "gateway/team-opus")
+	press(m, special(tea.KeyEnter))
+	if got := m.choiceOptions()[m.choice]; got != customChoice {
+		t.Fatalf("selected choice = %q, want custom", got)
+	}
+	press(m, special(tea.KeyEnter))
+	if got := string(m.input); got != "gateway/team-opus" {
+		t.Fatalf("custom model input = %q", got)
+	}
+}
+
+func TestAutoLanguageAndPersistedInterfaceChoice(t *testing.T) {
+	m := testModelWithSystemLanguage(t, "ru_RU.UTF-8")
+	if m.languageMode != languageAuto || m.language != languageRU {
+		t.Fatalf("language mode/resolved = %q/%q", m.languageMode, m.language)
+	}
+	if content := m.View().Content; !strings.Contains(content, "ГЛАВНОЕ МЕНЮ") {
+		t.Fatalf("auto-localized view is not Russian: %q", content)
+	}
+
+	m.category = 5 // Interface
+	m.focus = 1
+	for i, spec := range m.visibleSpecs() {
+		if spec.ID == "ui-language" {
+			m.selected = i
+			break
+		}
+	}
+	press(m, special(tea.KeyEnter))
+	selectChoice(t, m, "zh-CN")
+	press(m, special(tea.KeyEnter))
+	if m.languageMode != languageZH || m.language != languageZH {
+		t.Fatalf("selected language = %q/%q", m.languageMode, m.language)
+	}
+	raw, err := os.ReadFile(m.preferences)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"language": "zh-CN"`) {
+		t.Fatalf("preferences = %s", raw)
+	}
+	if m.dirty(config.Global) {
+		t.Fatal("interface language dirtied Claude Code settings")
+	}
+}
+
+func TestCategoryMenuScrollsToSelection(t *testing.T) {
+	m := testModel(t)
+	m.width, m.height = 90, 25
+	m.category = len(catalog.Categories()) - 1
+	content := m.View().Content
+	if !strings.Contains(content, "Behavior") {
+		t.Fatalf("selected final category is not visible: %q", content)
+	}
+}
+
 func testModel(t *testing.T) *Model {
+	return testModelWithSystemLanguage(t, "en_US.UTF-8")
+}
+
+func testModelWithSystemLanguage(t *testing.T, language string) *Model {
 	t.Helper()
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
 	project := filepath.Join(root, "project")
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	t.Setenv("LOCALAPPDATA", filepath.Join(home, "AppData", "Local"))
+	t.Setenv("LC_ALL", "")
+	t.Setenv("LC_MESSAGES", "")
+	t.Setenv("LANGUAGE", "")
+	t.Setenv("LANG", language)
 	if err := os.MkdirAll(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -160,4 +334,13 @@ func special(code rune) tea.KeyPressMsg {
 
 func typeText(m *Model, text string) {
 	press(m, textKey(text))
+}
+
+func selectChoice(t *testing.T, m *Model, value string) {
+	t.Helper()
+	index := slices.Index(m.choiceOptions(), value)
+	if index < 0 {
+		t.Fatalf("choice %q not found in %#v", value, m.choiceOptions())
+	}
+	m.choice = index
 }

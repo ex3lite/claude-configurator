@@ -49,15 +49,19 @@ type Model struct {
 	width, height int
 	dark          bool
 	noColor       bool
-	focus         int
+	focus         int // 0: main menu, 1: settings inside the selected category
 	category      int
 	selected      int
 	query         string
 	status        string
 	screen        screen
+	languageMode  uiLanguage
+	language      uiLanguage
+	preferences   string
 
 	editSpec      catalog.Spec
 	choice        int
+	choiceForList bool
 	listSelected  int
 	input         []rune
 	inputCursor   int
@@ -71,15 +75,19 @@ type Model struct {
 }
 
 func New(workspace *config.Workspace, scope config.Scope, version string) *Model {
+	languageMode, preferencesPath := loadLanguagePreference()
 	m := &Model{
-		workspace: workspace,
-		scope:     scope,
-		version:   version,
-		dark:      true,
-		noColor:   os.Getenv("NO_COLOR") != "",
-		screen:    browse,
-		focus:     1,
-		drafts:    make(map[config.Scope]map[string]any, 3),
+		workspace:    workspace,
+		scope:        scope,
+		version:      version,
+		dark:         true,
+		noColor:      os.Getenv("NO_COLOR") != "",
+		screen:       browse,
+		focus:        0,
+		languageMode: languageMode,
+		language:     resolveLanguage(languageMode),
+		preferences:  preferencesPath,
+		drafts:       make(map[config.Scope]map[string]any, 3),
 	}
 	m.resetDrafts()
 	return m
@@ -128,7 +136,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.screen = browse
 		} else if isNo(msg) {
 			m.screen = browse
-			m.status = "Change cancelled"
+			m.status = m.tr("status.cancelled")
 		}
 	case confirmQuit:
 		if isYes(msg) {
@@ -150,8 +158,10 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleBrowseKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.Key().Code == tea.KeySpace {
-		if spec, ok := m.currentSpec(); ok && spec.Kind == catalog.Boolean {
-			m.toggle(spec)
+		if m.focus == 1 {
+			if spec, ok := m.currentSpec(); ok && spec.Kind == catalog.Boolean {
+				m.toggle(spec)
+			}
 		}
 		return m, nil
 	}
@@ -173,8 +183,12 @@ func (m *Model) handleBrowseKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.query = ""
 			m.selected = 0
 		}
-	case "tab", "shift+tab":
-		m.focus = 1 - m.focus
+		m.focus = 0
+	case "left":
+		if m.focus == 1 {
+			m.focus = 0
+			m.selected = 0
+		}
 	case "g":
 		m.switchScope(config.Global)
 	case "p":
@@ -185,20 +199,28 @@ func (m *Model) handleBrowseKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.move(-1)
 	case "down", "j":
 		m.move(1)
-	case "left", "h":
-		m.moveCategory(-1)
-	case "right":
-		m.moveCategory(1)
 	case "enter":
-		m.openEditor()
+		if m.focus == 0 {
+			m.focus = 1
+			m.selected = 0
+		} else {
+			m.openEditor()
+		}
 	case "u", "backspace", "delete":
+		if m.focus != 1 {
+			break
+		}
 		if spec, ok := m.currentSpec(); ok {
+			if spec.App {
+				m.setLanguage(languageAuto)
+				break
+			}
 			config.Unset(m.drafts[m.scope], spec.Path)
-			m.status = spec.Label + " now inherits from a lower scope"
+			m.status = m.tr("status.inherit", m.specLabel(spec.ID, spec.Label))
 		}
 	case "s":
 		if !m.dirty(m.scope) {
-			m.status = "Nothing to save in " + string(m.scope)
+			m.status = m.tr("status.nothing_to_save", m.scopeLabel(string(m.scope)))
 		} else {
 			m.screen = showDiff
 		}
@@ -236,7 +258,7 @@ func (m *Model) moveCategory(delta int) {
 
 func (m *Model) switchScope(scope config.Scope) {
 	m.scope = scope
-	m.status = "Editing " + string(scope) + " settings"
+	m.status = m.tr("status.scope", m.scopeLabel(string(scope)))
 }
 
 func (m *Model) openEditor() {
@@ -249,13 +271,7 @@ func (m *Model) openEditor() {
 	case catalog.Boolean:
 		m.toggle(spec)
 	case catalog.Enum:
-		m.choice = 0
-		if current, _, ok := m.effective(spec); ok {
-			if index := slices.Index(spec.Options, fmt.Sprint(current)); index >= 0 {
-				m.choice = index
-			}
-		}
-		m.screen = editChoice
+		m.openChoice(spec, false, -1)
 	case catalog.List:
 		m.listSelected = 0
 		m.screen = editList
@@ -268,6 +284,39 @@ func (m *Model) openEditor() {
 	}
 }
 
+func (m *Model) openChoice(spec catalog.Spec, forList bool, listIndex int) {
+	m.editSpec = spec
+	m.choiceForList = forList
+	m.inputListEdit = listIndex
+	m.choice = 0
+	var current any
+	var ok bool
+	if forList {
+		items := m.ownList(spec)
+		if listIndex >= 0 && listIndex < len(items) {
+			current, ok = items[listIndex], true
+		}
+	} else {
+		current, _, ok = m.effective(spec)
+	}
+	if ok {
+		if index := slices.Index(spec.Options, fmt.Sprint(current)); index >= 0 {
+			m.choice = index
+		} else if spec.AllowCustom {
+			m.choice = len(spec.Options)
+		}
+	}
+	m.screen = editChoice
+}
+
+func (m *Model) choiceOptions() []string {
+	options := append([]string(nil), m.editSpec.Options...)
+	if m.editSpec.AllowCustom {
+		options = append(options, customChoice)
+	}
+	return options
+}
+
 func (m *Model) toggle(spec catalog.Spec) {
 	current := false
 	if value, _, ok := m.effective(spec); ok {
@@ -277,15 +326,42 @@ func (m *Model) toggle(spec catalog.Spec) {
 }
 
 func (m *Model) handleChoiceKey(msg tea.KeyPressMsg) {
+	options := m.choiceOptions()
 	switch msg.String() {
 	case "esc", "q":
-		m.screen = browse
-	case "up", "k", "left", "h":
-		m.choice = (m.choice - 1 + len(m.editSpec.Options)) % len(m.editSpec.Options)
-	case "down", "j", "right", "l":
-		m.choice = (m.choice + 1) % len(m.editSpec.Options)
+		if m.choiceForList {
+			m.screen = editList
+		} else {
+			m.screen = browse
+		}
+	case "up", "k":
+		m.choice = (m.choice - 1 + len(options)) % len(options)
+	case "down", "j":
+		m.choice = (m.choice + 1) % len(options)
 	case "enter", " ":
-		m.propose(m.editSpec, m.editSpec.Options[m.choice])
+		option := options[m.choice]
+		if option == customChoice {
+			value := ""
+			if m.choiceForList {
+				items := m.ownList(m.editSpec)
+				if m.inputListEdit >= 0 && m.inputListEdit < len(items) {
+					value = fmt.Sprint(items[m.inputListEdit])
+				}
+				m.openInput(listItem, m.editSpec, value, editList)
+			} else {
+				if current, _, ok := m.effective(m.editSpec); ok &&
+					slices.Index(m.editSpec.Options, fmt.Sprint(current)) < 0 {
+					value = fmt.Sprint(current)
+				}
+				m.openInput(settingValue, m.editSpec, value, browse)
+			}
+			return
+		}
+		if m.choiceForList {
+			m.commitListValue(option)
+			return
+		}
+		m.propose(m.editSpec, option)
 		if m.screen != confirmDanger {
 			m.screen = browse
 		}
@@ -307,15 +383,23 @@ func (m *Model) handleListKey(msg tea.KeyPressMsg) {
 		}
 	case "a":
 		if m.editSpec.MaxItems > 0 && len(items) >= m.editSpec.MaxItems {
-			m.status = fmt.Sprintf("%s accepts at most %d items", m.editSpec.Label, m.editSpec.MaxItems)
+			m.status = m.tr("status.max_items", m.specLabel(m.editSpec.ID, m.editSpec.Label), m.editSpec.MaxItems)
 			return
 		}
-		m.inputListEdit = -1
-		m.openInput(listItem, m.editSpec, "", editList)
+		if len(m.editSpec.Options) > 0 {
+			m.openChoice(m.editSpec, true, -1)
+		} else {
+			m.inputListEdit = -1
+			m.openInput(listItem, m.editSpec, "", editList)
+		}
 	case "e", "enter":
 		if len(items) > 0 {
-			m.inputListEdit = m.listSelected
-			m.openInput(listItem, m.editSpec, fmt.Sprint(items[m.listSelected]), editList)
+			if len(m.editSpec.Options) > 0 {
+				m.openChoice(m.editSpec, true, m.listSelected)
+			} else {
+				m.inputListEdit = m.listSelected
+				m.openInput(listItem, m.editSpec, fmt.Sprint(items[m.listSelected]), editList)
+			}
 		}
 	case "d", "delete", "backspace":
 		if len(items) > 0 {
@@ -324,9 +408,29 @@ func (m *Model) handleListKey(msg tea.KeyPressMsg) {
 			if m.listSelected >= len(items) && m.listSelected > 0 {
 				m.listSelected--
 			}
-			m.status = "Item removed"
+			m.status = m.tr("status.item_removed")
 		}
 	}
+}
+
+func (m *Model) commitListValue(value string) {
+	items := m.ownList(m.editSpec)
+	for i, item := range items {
+		if fmt.Sprint(item) == value && i != m.inputListEdit {
+			m.status = m.tr("status.duplicate")
+			m.screen = editList
+			return
+		}
+	}
+	if m.inputListEdit >= 0 && m.inputListEdit < len(items) {
+		items[m.inputListEdit] = value
+	} else {
+		items = append(items, value)
+		m.listSelected = len(items) - 1
+	}
+	config.Set(m.drafts[m.scope], m.editSpec.Path, items)
+	m.status = m.tr("status.list_updated")
+	m.screen = editList
 }
 
 func (m *Model) openInput(purpose inputPurpose, spec catalog.Spec, value string, returnTo screen) {
@@ -384,11 +488,12 @@ func (m *Model) commitInput() {
 	if m.inputPurpose == searchValue {
 		m.query = value
 		m.selected = 0
+		m.focus = 1
 		m.screen = browse
 		return
 	}
 	if value == "" {
-		m.status = "Value cannot be empty; use u to inherit instead"
+		m.status = m.tr("status.empty")
 		return
 	}
 	if m.inputPurpose == settingValue {
@@ -399,38 +504,47 @@ func (m *Model) commitInput() {
 		return
 	}
 
-	items := m.ownList(m.editSpec)
-	for i, item := range items {
-		if fmt.Sprint(item) == value && i != m.inputListEdit {
-			m.status = "Duplicate items are ignored"
-			return
-		}
-	}
-	if m.inputListEdit >= 0 && m.inputListEdit < len(items) {
-		items[m.inputListEdit] = value
-	} else {
-		items = append(items, value)
-		m.listSelected = len(items) - 1
-	}
-	config.Set(m.drafts[m.scope], m.editSpec.Path, items)
-	m.status = "List updated"
-	m.screen = editList
+	m.commitListValue(value)
 }
 
 func (m *Model) propose(spec catalog.Spec, value any) {
 	if message, dangerous := spec.Dangerous(value); dangerous {
 		m.pendingSpec = spec
 		m.pendingValue = value
-		m.dangerText = message
+		m.dangerText = m.dangerMessage(spec, value, message)
 		m.screen = confirmDanger
 		return
 	}
 	m.setValue(spec, value)
 }
 
+func (m *Model) dangerMessage(spec catalog.Spec, value any, fallback string) string {
+	if message := translations[m.language]["danger."+spec.ID+"."+fmt.Sprint(value)]; message != "" {
+		return message
+	}
+	return fallback
+}
+
 func (m *Model) setValue(spec catalog.Spec, value any) {
+	if spec.App {
+		m.setLanguage(uiLanguage(fmt.Sprint(value)))
+		return
+	}
 	config.Set(m.drafts[m.scope], spec.Path, value)
-	m.status = spec.Label + " staged"
+	m.status = m.tr("status.staged", m.specLabel(spec.ID, spec.Label))
+}
+
+func (m *Model) setLanguage(language uiLanguage) {
+	if !validLanguage(language) {
+		return
+	}
+	if err := saveLanguagePreference(m.preferences, language); err != nil {
+		m.status = m.tr("app.language.save_failed", err)
+		return
+	}
+	m.languageMode = language
+	m.language = resolveLanguage(language)
+	m.status = m.tr("app.language.saved")
 }
 
 func (m *Model) handleDiffKey(msg tea.KeyPressMsg) {
@@ -441,27 +555,27 @@ func (m *Model) handleDiffKey(msg tea.KeyPressMsg) {
 		err := m.workspace.Save(m.scope, m.drafts[m.scope], "")
 		if err != nil {
 			if errors.Is(err, config.ErrConflict) {
-				m.status = "Save blocked: the file changed on disk. Reload before editing again."
+				m.status = m.tr("status.conflict")
 			} else {
-				m.status = "Save failed: " + err.Error()
+				m.status = m.tr("status.save_failed", err)
 			}
 			m.screen = browse
 			return
 		}
 		m.drafts[m.scope] = config.Clone(m.workspace.Docs[m.scope].Data)
-		m.status = "Saved. Restart running Claude Code sessions to apply startup settings."
+		m.status = m.tr("status.saved")
 		m.screen = browse
 	}
 }
 
 func (m *Model) reload() {
 	if err := m.workspace.Reload(); err != nil {
-		m.status = "Reload failed: " + err.Error()
+		m.status = m.tr("status.reload_failed", err)
 		m.screen = browse
 		return
 	}
 	m.resetDrafts()
-	m.status = "Settings reloaded from disk"
+	m.status = m.tr("status.reloaded")
 	m.screen = browse
 }
 
@@ -484,6 +598,9 @@ func (m *Model) ownList(spec catalog.Spec) []any {
 }
 
 func (m *Model) effective(spec catalog.Spec) (any, string, bool) {
+	if spec.App {
+		return string(m.languageMode), m.tr("app.source"), true
+	}
 	scopes := []config.Scope{config.Global}
 	if m.scope == config.Project || m.scope == config.Local {
 		scopes = append(scopes, config.Project)
@@ -557,7 +674,11 @@ func (m *Model) visibleSpecs() []catalog.Spec {
 			}
 			continue
 		}
-		haystack := strings.ToLower(spec.Label + " " + spec.Path + " " + spec.Description)
+		haystack := strings.ToLower(
+			spec.Label + " " + m.specLabel(spec.ID, spec.Label) + " " +
+				spec.Path + " " + spec.Description + " " +
+				m.specDescription(spec.ID, spec.Description),
+		)
 		if strings.Contains(haystack, query) {
 			specs = append(specs, spec)
 		}
@@ -568,6 +689,9 @@ func (m *Model) visibleSpecs() []catalog.Spec {
 func (m *Model) diffLines() []string {
 	var lines []string
 	for _, spec := range catalog.Specs {
+		if spec.App {
+			continue
+		}
 		old, oldOK := config.Get(m.workspace.Docs[m.scope].Data, spec.Path)
 		next, nextOK := config.Get(m.drafts[m.scope], spec.Path)
 		if oldOK == nextOK && config.Equal(old, next) {
@@ -613,7 +737,7 @@ func isNo(msg tea.KeyPressMsg) bool {
 
 func (m *Model) View() tea.View {
 	var content string
-	if m.width < 48 || m.height < 12 {
+	if m.width < 48 || m.height < 16 {
 		content = m.renderTiny()
 	} else {
 		switch m.screen {
@@ -628,11 +752,11 @@ func (m *Model) View() tea.View {
 		case showHelp:
 			content = m.renderHelp()
 		case confirmDanger:
-			content = m.renderConfirm("Dangerous setting", m.dangerText, "Enter/y apply · Esc/n cancel", true)
+			content = m.renderConfirm(m.tr("confirm.danger.title"), m.dangerText, m.tr("confirm.danger.help"), true)
 		case confirmQuit:
-			content = m.renderConfirm("Discard staged changes?", "Unsaved changes exist in one or more scopes.", "Enter/y discard · Esc/n stay", true)
+			content = m.renderConfirm(m.tr("confirm.quit.title"), m.tr("confirm.quit.text"), m.tr("confirm.quit.help"), true)
 		case confirmReload:
-			content = m.renderConfirm("Reload from disk?", "All staged changes will be discarded.", "Enter/y reload · Esc/n stay", true)
+			content = m.renderConfirm(m.tr("confirm.reload.title"), m.tr("confirm.reload.text"), m.tr("confirm.reload.help"), true)
 		default:
 			content = m.renderBrowser()
 		}
@@ -645,7 +769,7 @@ func (m *Model) View() tea.View {
 
 func (m *Model) renderTiny() string {
 	title := m.style("#006D77", "#67E8F9").Bold(true).Render("Claude Configurator")
-	return title + "\n\nTerminal is too small.\nResize to at least 48×12.\n\nq quit"
+	return title + "\n\n" + m.tr("tiny.text") + "\n\n" + m.tr("tiny.quit")
 }
 
 func (m *Model) renderBrowser() string {
@@ -654,97 +778,149 @@ func (m *Model) renderBrowser() string {
 	bodyHeight := max(8, m.height-lipgloss.Height(header)-lipgloss.Height(footer)-2)
 	var body string
 	switch {
-	case m.width >= 110:
-		categoryWidth := 19
-		settingsWidth := 40
-		detailWidth := max(42, m.width-categoryWidth-settingsWidth-4)
-		body = lipgloss.JoinHorizontal(lipgloss.Top,
-			m.panel("CATEGORIES", m.renderCategories(bodyHeight-2), categoryWidth, bodyHeight, m.focus == 0),
-			m.panel("SETTINGS", m.renderSettings(bodyHeight-2), settingsWidth, bodyHeight, m.focus == 1),
-			m.panel("DETAIL", m.renderDetail(detailWidth-4), detailWidth, bodyHeight, false),
+	case m.focus == 0 && m.query == "":
+		body = m.panel(
+			m.tr("panel.categories"),
+			m.renderCategoryMenu(m.width-4, bodyHeight-4),
+			m.width,
+			bodyHeight,
+			true,
 		)
 	case m.width >= 78:
-		tabs := m.renderCategoryTabs()
-		settingsWidth := 38
-		detailWidth := max(36, m.width-settingsWidth-2)
-		panels := lipgloss.JoinHorizontal(lipgloss.Top,
-			m.panel("SETTINGS", m.renderSettings(bodyHeight-3), settingsWidth, bodyHeight-1, true),
-			m.panel("DETAIL", m.renderDetail(detailWidth-4), detailWidth, bodyHeight-1, false),
+		settingsWidth := min(46, max(36, m.width*42/100))
+		detailWidth := m.width - settingsWidth
+		body = lipgloss.JoinHorizontal(lipgloss.Top,
+			m.panel(m.tr("panel.settings"), m.renderSettings(settingsWidth-4, bodyHeight-4), settingsWidth, bodyHeight, true),
+			m.panel(m.tr("panel.detail"), m.renderDetail(detailWidth-4), detailWidth, bodyHeight, false),
 		)
-		body = tabs + "\n" + panels
 	default:
-		listHeight := max(5, bodyHeight/2)
-		body = m.renderCategoryTabs() + "\n" +
-			m.panel("SETTINGS", m.renderSettings(listHeight-2), m.width, listHeight, true) + "\n" +
-			m.panel("DETAIL", m.renderDetail(m.width-4), m.width, bodyHeight-listHeight-1, false)
+		if bodyHeight < 18 {
+			body = m.panel(
+				m.tr("panel.settings"),
+				m.renderSettings(m.width-4, bodyHeight-4),
+				m.width,
+				bodyHeight,
+				true,
+			)
+		} else {
+			listHeight := max(7, bodyHeight/2-1)
+			body = m.panel(m.tr("panel.settings"), m.renderSettings(m.width-4, listHeight-4), m.width, listHeight, true) + "\n" +
+				m.panel(m.tr("panel.detail"), m.renderDetail(m.width-4), m.width, bodyHeight-listHeight-1, false)
+		}
 	}
 	return header + "\n" + body + "\n" + footer
 }
 
 func (m *Model) renderHeader() string {
-	title := m.style("#006D77", "#67E8F9").Bold(true).Render("CLAUDE CONFIG")
+	title := m.style("#006D77", "#67E8F9").Bold(true).Render("◆ CLAUDE CONFIG")
 	versionText := m.version
 	if versionText != "dev" && !strings.HasPrefix(versionText, "v") {
 		versionText = "v" + versionText
 	}
 	version := m.muted().Render(" " + versionText)
-	scope := m.style("#6D28D9", "#C4B5FD").Bold(true).Render(strings.ToUpper(string(m.scope)))
 	path := m.workspace.Paths.For(m.scope)
 	dirty := ""
 	if m.dirty(m.scope) {
-		dirty = m.warning().Render("  ● staged")
+		dirty = "  " + m.warning().Render(m.tr("header.staged"))
 	}
-	left := title + version + "   " + scope + dirty
+	left := title + version + dirty
 	right := m.muted().Render(truncate(path, max(10, m.width-lipgloss.Width(left)-2)))
 	gap := max(1, m.width-lipgloss.Width(left)-lipgloss.Width(right))
-	return left + strings.Repeat(" ", gap) + right
+	first := left + strings.Repeat(" ", gap) + right
+
+	var scopes []string
+	for _, item := range []struct {
+		key   string
+		scope config.Scope
+	}{{"G", config.Global}, {"P", config.Project}, {"L", config.Local}} {
+		label := item.key + " " + m.scopeLabel(string(item.scope))
+		style := m.muted().Padding(0, 1)
+		if item.scope == m.scope {
+			style = m.scopeStyle().Padding(0, 1)
+		}
+		scopes = append(scopes, style.Render(label))
+	}
+	breadcrumb := m.renderBreadcrumb()
+	scopeLine := strings.Join(scopes, " ")
+	secondGap := max(1, m.width-lipgloss.Width(scopeLine)-lipgloss.Width(breadcrumb))
+	second := scopeLine + strings.Repeat(" ", secondGap) + breadcrumb
+	rule := m.muted().Render(strings.Repeat("─", max(1, m.width)))
+	return first + "\n" + second + "\n" + rule
 }
 
 func (m *Model) renderFooter() string {
-	keys := "↑↓ navigate  Enter edit  Space toggle  / search  u inherit  s save  ? help  q quit"
-	if m.width < 110 {
-		keys = "↑↓ move  Enter edit  / search  u inherit  s save  ? help  q quit"
+	keys := m.tr("footer.categories")
+	if m.focus == 1 || m.query != "" {
+		keys = m.tr("footer.settings")
 	}
 	if m.status != "" {
-		keys = m.status
+		keys = "  " + m.status
 	}
 	return m.muted().Width(max(1, m.width)).Render(truncate(keys, m.width))
 }
 
-func (m *Model) renderCategories(height int) string {
+func (m *Model) renderBreadcrumb() string {
+	if m.query != "" {
+		return m.style("#6D28D9", "#C4B5FD").Bold(true).Render(m.tr("breadcrumb.search", m.query))
+	}
+	menu := m.muted().Render(m.tr("breadcrumb.menu"))
+	if m.focus == 0 {
+		return menu
+	}
+	category := catalog.Categories()[m.category]
+	return menu + m.muted().Render("  /  ") +
+		m.accent().Bold(true).Render(m.categoryLabel(category))
+}
+
+func (m *Model) renderCategoryMenu(width, height int) string {
+	var lines []string
 	categories := catalog.Categories()
-	lines := make([]string, 0, len(categories))
-	for i, category := range categories {
-		prefix := "  "
+	stride := 3
+	if width >= 76 {
+		stride = 2
+	}
+	visible := max(1, height/stride)
+	start := 0
+	if m.category >= visible {
+		start = m.category - visible + 1
+	}
+	end := min(len(categories), start+visible)
+	for i := start; i < end; i++ {
+		category := categories[i]
+		marker := "◇"
 		style := m.muted()
 		if i == m.category {
-			prefix = "› "
+			marker = "◆"
 			style = m.selectedStyle()
 		}
-		lines = append(lines, style.Render(prefix+category))
+		title := fmt.Sprintf("%s  %s  ·  %s",
+			marker,
+			m.categoryLabel(category),
+			m.tr("category.settings_count", m.categoryCount(category)),
+		)
+		lines = append(lines, style.Width(max(1, width)).Render(truncate(title, width)))
+		lines = append(lines, m.muted().Render("   "+truncate(m.categoryDescription(category), max(4, width-3))))
+		if stride == 3 {
+			lines = append(lines, "")
+		}
 	}
 	return fitLines(lines, height)
 }
 
-func (m *Model) renderCategoryTabs() string {
-	if m.query != "" {
-		return m.style("#6D28D9", "#C4B5FD").Bold(true).Render("Search: " + m.query)
-	}
-	var tabs []string
-	for i, category := range catalog.Categories() {
-		style := m.muted().Padding(0, 1)
-		if i == m.category {
-			style = m.selectedStyle().Padding(0, 1)
+func (m *Model) categoryCount(category string) int {
+	count := 0
+	for _, spec := range catalog.Specs {
+		if spec.Category == category {
+			count++
 		}
-		tabs = append(tabs, style.Render(category))
 	}
-	return truncate(strings.Join(tabs, " "), m.width)
+	return count
 }
 
-func (m *Model) renderSettings(height int) string {
+func (m *Model) renderSettings(width, height int) string {
 	specs := m.visibleSpecs()
 	if len(specs) == 0 {
-		return m.muted().Render("No matching settings")
+		return m.muted().Render(m.tr("empty.no_matches"))
 	}
 	start := 0
 	if m.selected >= height {
@@ -755,31 +931,37 @@ func (m *Model) renderSettings(height int) string {
 	for i := start; i < end; i++ {
 		spec := specs[i]
 		value, source, ok := m.effective(spec)
-		text := "<inherit>"
+		text := m.tr("value.inherit")
 		if ok {
-			text = compactValue(value)
-			if source != string(m.scope) {
+			text = m.compactValue(spec, value)
+			if !spec.App && source != string(m.scope) {
 				text += "  ↳"
 			}
 		}
 		changed := " "
-		old, oldOK := config.Get(m.workspace.Docs[m.scope].Data, spec.Path)
-		next, nextOK := config.Get(m.drafts[m.scope], spec.Path)
-		if oldOK != nextOK || !config.Equal(old, next) {
-			changed = "●"
+		if !spec.App {
+			old, oldOK := config.Get(m.workspace.Docs[m.scope].Data, spec.Path)
+			next, nextOK := config.Get(m.drafts[m.scope], spec.Path)
+			if oldOK != nextOK || !config.Equal(old, next) {
+				changed = "●"
+			}
 		}
 		cursor := " "
 		if i == m.selected {
 			cursor = "›"
 		}
-		line := fmt.Sprintf("%s%s %-17s %s", cursor, changed, truncate(spec.Label, 17), truncate(text, 10))
+		labelWidth := min(23, max(12, width/2))
+		valueWidth := max(6, width-labelWidth-5)
+		label := truncate(m.specLabel(spec.ID, spec.Label), labelWidth)
+		label = lipgloss.NewStyle().Width(labelWidth).Render(label)
+		line := cursor + changed + " " + label + " " + truncate(text, valueWidth)
 		style := m.muted()
 		if i == m.selected {
 			style = m.selectedStyle()
 		} else if changed == "●" {
 			style = m.warning()
 		}
-		lines = append(lines, style.Render(truncate(line, 33)))
+		lines = append(lines, style.Width(max(1, width)).Render(truncate(line, width)))
 	}
 	return fitLines(lines, height)
 }
@@ -787,49 +969,103 @@ func (m *Model) renderSettings(height int) string {
 func (m *Model) renderDetail(width int) string {
 	spec, ok := m.currentSpec()
 	if !ok {
-		return "No setting selected"
+		return m.tr("empty.no_matches")
 	}
-	own, ownOK := config.Get(m.drafts[m.scope], spec.Path)
+	var own any
+	var ownOK bool
+	if spec.App {
+		own, ownOK = string(m.languageMode), true
+	} else {
+		own, ownOK = config.Get(m.drafts[m.scope], spec.Path)
+	}
 	effective, source, effectiveOK := m.effective(spec)
-	target := "<inherit>"
+	target := m.tr("value.inherit")
 	if ownOK {
-		target = formatValue(own)
+		target = m.displayValue(spec, own)
 	}
-	resolved := "<Claude default>"
+	resolved := m.tr("value.claude_default")
 	if effectiveOK {
-		resolved = formatValue(effective)
+		resolved = m.displayValue(spec, effective)
+	}
+	if spec.App && m.languageMode == languageAuto {
+		resolved += "\n" + m.tr("app.language.resolved", m.optionLabel(spec.ID, string(m.language)))
+	}
+	path := spec.Path
+	if spec.App {
+		path = "claude-configurator/config.json"
 	}
 	lines := []string{
-		m.accent().Bold(true).Render(spec.Label),
-		m.muted().Render(spec.Path),
+		m.accent().Bold(true).Render(m.specLabel(spec.ID, spec.Label)),
+		m.muted().Render(path),
 		"",
-		m.muted().Render("THIS SCOPE"),
+		m.muted().Render(m.tr("detail.this_scope")),
 		wrap(target, width),
 		"",
-		m.muted().Render("EFFECTIVE"),
+		m.muted().Render(m.tr("detail.effective")),
 		wrap(resolved, width),
 	}
 	if source != "" {
-		lines = append(lines, m.muted().Render("source: "+source))
+		lines = append(lines, m.muted().Render(m.tr("detail.source", m.sourceLabel(source))))
 	}
-	lines = append(lines, "", wrap(spec.Description, width))
+	lines = append(lines, "", wrap(m.specDescription(spec.ID, spec.Description), width))
 	if len(spec.Options) > 0 {
-		lines = append(lines, "", m.muted().Render("Suggestions: "+strings.Join(spec.Options, ", ")))
+		var options []string
+		for _, option := range spec.Options {
+			options = append(options, m.optionLabel(spec.ID, option))
+		}
+		lines = append(lines, "", m.muted().Render(wrap(m.tr("detail.suggestions", strings.Join(options, ", ")), width)))
 	}
 	if spec.Kind == catalog.List && strings.HasPrefix(spec.Path, "permissions.") {
-		lines = append(lines, "", m.muted().Render("Permission arrays merge across scopes."))
+		lines = append(lines, "", m.muted().Render(m.tr("detail.permissions_merge")))
+	}
+	if spec.App {
+		lines = append(lines, "", m.muted().Render(m.tr("detail.app_storage", m.preferences)))
 	}
 	return strings.Join(lines, "\n")
 }
 
+func (m *Model) displayValue(spec catalog.Spec, value any) string {
+	switch typed := value.(type) {
+	case string:
+		return m.optionLabel(spec.ID, typed)
+	case bool:
+		if typed {
+			return m.tr("value.on")
+		}
+		return m.tr("value.off")
+	default:
+		return formatValue(value)
+	}
+}
+
+func (m *Model) compactValue(spec catalog.Spec, value any) string {
+	if items, ok := value.([]any); ok {
+		return m.tr("value.items", len(items))
+	}
+	return truncate(m.displayValue(spec, value), 18)
+}
+
+func (m *Model) sourceLabel(source string) string {
+	parts := strings.Split(source, "+")
+	for i, part := range parts {
+		switch part {
+		case string(config.Global), string(config.Project), string(config.Local):
+			parts[i] = m.scopeLabel(part)
+		}
+	}
+	return strings.Join(parts, "+")
+}
+
 func (m *Model) renderTextEditor() string {
-	title := m.editSpec.Label
-	description := m.editSpec.Description
+	title := m.specLabel(m.editSpec.ID, m.editSpec.Label)
+	description := m.specDescription(m.editSpec.ID, m.editSpec.Description)
 	if m.inputPurpose == searchValue {
-		title = "Search settings"
-		description = "Match labels, JSON paths, and descriptions."
+		title = m.tr("search.title")
+		description = m.tr("search.description")
+	} else if m.editSpec.AllowCustom {
+		title = m.tr("editor.custom_model")
 	} else if m.inputPurpose == listItem {
-		title = "Edit " + m.editSpec.Label
+		title = m.tr("editor.edit", m.specLabel(m.editSpec.ID, m.editSpec.Label))
 	}
 	cursor := m.inputCursor
 	before := string(m.input[:cursor])
@@ -837,35 +1073,60 @@ func (m *Model) renderTextEditor() string {
 	value := before + m.accent().Reverse(true).Render(" ") + after
 	body := wrap(description, m.modalContentWidth()) + "\n\n" +
 		m.inputStyle().Render(value) + "\n\n" +
-		m.muted().Render("Enter apply · Esc cancel · ←→ move")
+		m.muted().Render(m.tr("editor.apply"))
 	if len(m.editSpec.Options) > 0 && m.inputPurpose == settingValue {
-		body += "\n" + m.muted().Render("Suggestions: "+strings.Join(m.editSpec.Options, ", "))
+		var options []string
+		for _, option := range m.editSpec.Options {
+			options = append(options, m.optionLabel(m.editSpec.ID, option))
+		}
+		body += "\n" + m.muted().Render(
+			wrap(m.tr("detail.suggestions", strings.Join(options, ", ")), m.modalContentWidth()),
+		)
 	}
 	return m.modal(title, body, false)
 }
 
 func (m *Model) renderChoice() string {
+	options := m.choiceOptions()
 	var lines []string
-	for i, option := range m.editSpec.Options {
+	visible := max(3, m.height-10)
+	start := 0
+	if m.choice >= visible {
+		start = m.choice - visible + 1
+	}
+	end := min(len(options), start+visible)
+	for i := start; i < end; i++ {
+		option := options[i]
 		style := m.muted()
 		prefix := "  "
 		if i == m.choice {
 			style = m.selectedStyle()
 			prefix = "› "
 		}
-		lines = append(lines, style.Render(prefix+option))
+		label := m.optionLabel(m.editSpec.ID, option)
+		raw := option
+		if option == customChoice || raw == label {
+			raw = ""
+		}
+		line := prefix + label
+		if raw != "" {
+			line += "  ·  " + raw
+		}
+		lines = append(lines, style.Width(max(1, m.modalContentWidth())).Render(
+			truncate(line, m.modalContentWidth()),
+		))
 	}
-	body := wrap(m.editSpec.Description, m.modalContentWidth()) + "\n\n" +
+	body := wrap(m.specDescription(m.editSpec.ID, m.editSpec.Description), m.modalContentWidth()) + "\n\n" +
 		strings.Join(lines, "\n") + "\n\n" +
-		m.muted().Render("↑↓ choose · Enter apply · Esc cancel")
-	return m.modal(m.editSpec.Label, body, false)
+		m.muted().Render(m.tr("choice.help"))
+	return m.modal(m.specLabel(m.editSpec.ID, m.editSpec.Label), body, false)
 }
 
 func (m *Model) renderList() string {
 	items := m.ownList(m.editSpec)
 	var lines []string
 	if len(items) == 0 {
-		lines = append(lines, m.muted().Render("No values in this scope"))
+		lines = append(lines, m.muted().Render(m.tr("list.empty")))
 	} else {
 		for i, item := range items {
 			style := m.muted()
@@ -874,16 +1135,17 @@ func (m *Model) renderList() string {
 				style = m.selectedStyle()
 				prefix = "› "
 			}
-			lines = append(lines, style.Render(prefix+fmt.Sprint(item)))
+			value := m.optionLabel(m.editSpec.ID, fmt.Sprint(item))
+			lines = append(lines, style.Render(prefix+value))
 		}
 	}
-	body := wrap(m.editSpec.Description, m.modalContentWidth()) + "\n\n" +
+	body := wrap(m.specDescription(m.editSpec.ID, m.editSpec.Description), m.modalContentWidth()) + "\n\n" +
 		strings.Join(lines, "\n") + "\n\n" +
-		m.muted().Render("a add · Enter/e edit · d delete · Esc done")
+		m.muted().Render(m.tr("list.help"))
 	if m.editSpec.MaxItems > 0 {
-		body += "\n" + m.muted().Render(fmt.Sprintf("Maximum: %d items", m.editSpec.MaxItems))
+		body += "\n" + m.muted().Render(m.tr("list.maximum", m.editSpec.MaxItems))
 	}
-	return m.modal(m.editSpec.Label, body, false)
+	return m.modal(m.specLabel(m.editSpec.ID, m.editSpec.Label), body, false)
 }
 
 func (m *Model) renderDiff() string {
@@ -905,32 +1167,20 @@ func (m *Model) renderDiff() string {
 		rendered = append(rendered, style.Render(wrap(line, m.modalContentWidth())))
 	}
 	if hidden > 0 {
-		rendered = append(rendered, m.muted().Render(fmt.Sprintf("… %d more changes", hidden)))
+		rendered = append(rendered, m.muted().Render(m.tr("diff.more", hidden)))
 	}
 	body := strings.Join(rendered, "\n") + "\n\n" +
-		m.muted().Render("Enter/y/s save · Esc/n cancel") + "\n" +
+		m.muted().Render(m.tr("diff.help")) + "\n" +
 		m.muted().Render(m.workspace.Paths.For(m.scope))
-	return m.modal("Save "+string(m.scope)+" settings?", body, false)
+	return m.modal(m.tr("diff.title", m.scopeLabel(string(m.scope))), body, false)
 }
 
 func (m *Model) renderHelp() string {
-	body := `Navigation
-  ↑/↓ or j/k    move
-  ←/→           category
-  Tab           switch focus
-  g / p / l     global / project / local
-
-Editing
-  Enter         edit value
-  Space         toggle boolean
-  u             unset and inherit
-  /             search
-  s             review and save
-  r             reload from disk
-  q             quit
-
-Values marked ↳ are inherited. ● marks staged changes.`
-	return m.modal("Keyboard help", body+"\n\n"+m.muted().Render("Esc or ? close"), false)
+	return m.modal(
+		m.tr("help.title"),
+		m.helpText()+"\n\n"+m.muted().Render(m.tr("help.close")),
+		false,
+	)
 }
 
 func (m *Model) renderConfirm(title, text, footer string, dangerous bool) string {
@@ -958,9 +1208,10 @@ func (m *Model) panel(title, body string, width, height int, active bool) string
 	if active {
 		titleStyle = m.accent().Bold(true)
 	}
+	body = limitLines(body, max(0, height-4))
 	return m.panelStyle(active).
-		Width(max(1, width-2)).
-		Height(max(1, height-2)).
+		Width(max(4, width)).
+		Height(max(4, height)).
 		Render(titleStyle.Render(title) + "\n\n" + body)
 }
 
@@ -988,6 +1239,14 @@ func (m *Model) selectedStyle() lipgloss.Style {
 	style := m.style("#5B21B6", "#DDD6FE").Bold(true)
 	if !m.noColor {
 		style = style.Background(m.color("#EDE9FE", "#4C1D95"))
+	}
+	return style
+}
+
+func (m *Model) scopeStyle() lipgloss.Style {
+	style := m.style("#0F766E", "#A5F3FC").Bold(true)
+	if !m.noColor {
+		style = style.Background(m.color("#CCFBF1", "#164E63"))
 	}
 	return style
 }
@@ -1025,15 +1284,6 @@ func (m *Model) color(light, dark string) color.Color {
 		return nil
 	}
 	return lipgloss.LightDark(m.dark)(lipgloss.Color(light), lipgloss.Color(dark))
-}
-
-func compactValue(value any) string {
-	switch typed := value.(type) {
-	case []any:
-		return fmt.Sprintf("%d items", len(typed))
-	default:
-		return truncate(formatValue(value), 13)
-	}
 }
 
 func truncate(text string, width int) string {

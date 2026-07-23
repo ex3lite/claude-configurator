@@ -14,8 +14,10 @@
 ## 功能
 
 - 支持全局、项目共享和项目本地三个作用域。
-- 配置主模型、子代理模型、Advisor 模型和回退模型链。
+- 使用选择器配置主模型、子代理模型、Advisor 模型和回退模型链；
+  常规模型无需手动输入。
 - 配置推理、代理、权限、沙箱、界面和行为。
+- TUI 可按系统语言自动切换英语、俄语或简体中文。
 - 支持搜索、继承值与来源显示、暂存修改和保存前 diff。
 - 检测写入冲突、自动备份，并拒绝覆盖无效 JSON。
 - 正确识别 Git 仓库和 worktree。
@@ -70,7 +72,8 @@ Claude Configurator 只编辑后三层，不修改组织托管策略。
 
 ### 使用 Fable 主模型和 Sonnet 子代理
 
-按 `g` 选择 global 作用域，然后设置：
+按 `g` 选择 global 作用域，打开**模型**，为主模型选择
+**Fable 5 · 1M**，为子代理选择 **Sonnet 5**。生成的设置为：
 
 ```json
 {
@@ -85,14 +88,26 @@ Claude Configurator 只编辑后三层，不修改组织托管策略。
 agent teams 和 workflow agents，并覆盖单个代理内的模型选择。保存后请重启
 已经运行的 Claude Code 会话。
 
+选择器包含 Claude Code 稳定别名：`default`、`best`、`sonnet`、`opus`、
+`haiku`、1M 上下文选项和 `opusplan`。最后的**自定义模型 ID…**仅用于
+gateway 或提供商特定部署；常规模型选择不会再打开字符串输入框。详见
+[官方模型配置文档](https://code.claude.com/docs/en/model-config)。
+
+### 界面语言
+
+TUI 默认使用**自动**模式并跟随操作系统语言。在
+**界面 → 界面语言**中可以选择自动、English、Русский 或简体中文。
+该偏好保存在操作系统的 Claude Configurator 用户配置目录中，不会写入
+Claude Code 设置。
+
 ### 快捷键
 
 | 按键 | 操作 |
 |---|---|
-| `↑/↓`、`j/k` | 导航 |
-| `←/→` | 切换分类 |
+| `↑/↓`、`j/k` | 在当前界面选择项目 |
+| `Enter` | 打开分类或编辑设置 |
+| `Esc`、`←` | 返回主菜单 |
 | `g`、`p`、`l` | Global、project、local |
-| `Enter` | 编辑 |
 | `Space` | 切换布尔值 |
 | `/` | 搜索 |
 | `u` | 删除当前值并继承 |

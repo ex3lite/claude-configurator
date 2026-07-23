@@ -15,8 +15,10 @@ anywhere.
 ## Features
 
 - Global, shared project, and local project scopes.
-- Main, subagent, advisor, and fallback model controls.
+- Pickers for main, subagent, advisor, and fallback models; no raw typing for
+  normal model selection.
 - Reasoning, agents, permissions, sandbox, interface, and behavior settings.
+- Auto-localized TUI in English, Russian, or Simplified Chinese.
 - Search, inherited-value/source display, staged changes, and diff before save.
 - Conflict detection, automatic backups, and protection against invalid JSON.
 - Git repository and worktree-aware paths.
@@ -72,7 +74,8 @@ managed policy.
 
 ### Fable main model with Sonnet subagents
 
-Select the global scope with `g`, then set:
+Select the global scope with `g`, open **Models**, and choose **Fable 5 · 1M**
+for the main model and **Sonnet 5** for subagents. The resulting settings are:
 
 ```json
 {
@@ -88,14 +91,27 @@ subagent setting applies to all subagents, agent teams, and workflow agents,
 and overrides per-agent model choices. Restart already-running Claude Code
 sessions after saving.
 
+The picker includes Claude Code's stable `default`, `best`, `sonnet`, `opus`,
+`haiku`, 1M-context, and `opusplan` aliases. **Custom model ID…** remains the
+last explicit option for gateways and provider-specific deployments; ordinary
+model selection never opens a string field. See the
+[official model configuration](https://code.claude.com/docs/en/model-config).
+
+### Interface language
+
+The TUI starts in **Auto** mode and follows the operating system language.
+Open **Interface → Interface language** to choose Auto, English, Русский, or
+简体中文. This preference is saved in the operating system's user configuration
+directory for Claude Configurator and is not written to Claude Code settings.
+
 ### Keyboard
 
 | Key | Action |
 |---|---|
-| `↑/↓`, `j/k` | Navigate |
-| `←/→` | Change category |
+| `↑/↓`, `j/k` | Select an item in the current screen |
+| `Enter` | Open a category or edit a setting |
+| `Esc`, `←` | Return to the main menu |
 | `g`, `p`, `l` | Global, project, local scope |
-| `Enter` | Edit |
 | `Space` | Toggle a boolean |
 | `/` | Search |
 | `u` | Unset and inherit |

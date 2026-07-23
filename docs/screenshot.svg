@@ -1,53 +1,89 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
-  <title id="title">Claude Configurator terminal interface</title>
-  <desc id="desc">A dark terminal window showing global, project, and local Claude Code settings with categories, values, and details.</desc>
-  <rect width="1200" height="720" rx="22" fill="#070b16"/>
-  <rect x="1" y="1" width="1198" height="718" rx="21" fill="none" stroke="#27324a" stroke-width="2"/>
-  <circle cx="32" cy="30" r="7" fill="#fb7185"/>
-  <circle cx="56" cy="30" r="7" fill="#fbbf24"/>
-  <circle cx="80" cy="30" r="7" fill="#34d399"/>
+  <title id="title">Claude Configurator model picker</title>
+  <desc id="desc">A dark terminal interface with scope controls, hierarchical navigation, and a model picker containing Claude aliases and custom model presets.</desc>
+  <defs>
+    <linearGradient id="shell" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07101e"/>
+      <stop offset="1" stop-color="#080712"/>
+    </linearGradient>
+    <linearGradient id="selected" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4c1d95"/>
+      <stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#020617" flood-opacity=".8"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="720" rx="24" fill="url(#shell)"/>
+  <rect x="1" y="1" width="1198" height="718" rx="23" fill="none" stroke="#26344d" stroke-width="2"/>
+  <circle cx="32" cy="29" r="7" fill="#fb7185"/>
+  <circle cx="56" cy="29" r="7" fill="#fbbf24"/>
+  <circle cx="80" cy="29" r="7" fill="#34d399"/>
+
   <g font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace">
-    <text x="28" y="76" fill="#67e8f9" font-size="21" font-weight="700">CLAUDE CONFIG</text>
-    <text x="208" y="76" fill="#94a3b8" font-size="17">v0.1.0</text>
-    <text x="310" y="76" fill="#ddd6fe" font-size="17" font-weight="700">GLOBAL</text>
-    <text x="1170" y="76" fill="#64748b" font-size="15" text-anchor="end">~/.claude/settings.json</text>
+    <text x="28" y="75" fill="#67e8f9" font-size="21" font-weight="700">◆ CLAUDE CONFIG</text>
+    <text x="245" y="75" fill="#64748b" font-size="16">v0.2.0</text>
+    <text x="1170" y="75" fill="#64748b" font-size="15" text-anchor="end">~/.claude/settings.json</text>
 
-    <g font-size="16" fill="#94a3b8">
-      <text x="30" y="116" fill="#ddd6fe" font-weight="700">Models</text>
-      <text x="130" y="116">Reasoning</text>
-      <text x="252" y="116">Agents</text>
-      <text x="340" y="116">Permissions</text>
-      <text x="472" y="116">Safety</text>
-      <text x="554" y="116">Interface</text>
-      <text x="670" y="116">Behavior</text>
+    <rect x="27" y="91" width="116" height="31" rx="6" fill="#164e63"/>
+    <text x="42" y="112" fill="#a5f3fc" font-size="15" font-weight="700">G  GLOBAL</text>
+    <text x="162" y="112" fill="#64748b" font-size="15">P  PROJECT</text>
+    <text x="284" y="112" fill="#64748b" font-size="15">L  LOCAL</text>
+    <text x="1170" y="112" fill="#c4b5fd" font-size="15" text-anchor="end">Main menu  /  Models</text>
+    <line x1="26" y1="135" x2="1174" y2="135" stroke="#334155"/>
+
+    <g opacity=".34">
+      <rect x="26" y="154" width="424" height="490" rx="11" fill="#0b1222" stroke="#22d3ee" stroke-width="2"/>
+      <rect x="470" y="154" width="704" height="490" rx="11" fill="#0b1222" stroke="#334155" stroke-width="2"/>
+      <text x="47" y="185" fill="#67e8f9" font-size="14" font-weight="700">SETTINGS</text>
+      <text x="491" y="185" fill="#94a3b8" font-size="14" font-weight="700">DETAIL</text>
+      <rect x="41" y="204" width="394" height="38" rx="5" fill="#4c1d95"/>
+      <text x="54" y="228" fill="#f5f3ff" font-size="16">› Main model</text>
+      <text x="420" y="228" fill="#f5f3ff" font-size="15" text-anchor="end">Fable 5 · 1M</text>
+      <text x="54" y="274" fill="#94a3b8" font-size="16">  Subagent model</text>
+      <text x="420" y="274" fill="#94a3b8" font-size="15" text-anchor="end">Sonnet 5</text>
+      <text x="493" y="227" fill="#67e8f9" font-size="21" font-weight="700">Main model</text>
+      <text x="493" y="257" fill="#64748b" font-size="15">model</text>
     </g>
-    <rect x="25" y="130" width="430" height="510" rx="12" fill="#0b1222" stroke="#22d3ee" stroke-width="2"/>
-    <rect x="475" y="130" width="700" height="510" rx="12" fill="#0b1222" stroke="#334155" stroke-width="2"/>
-    <text x="45" y="164" fill="#67e8f9" font-size="15" font-weight="700">SETTINGS</text>
-    <text x="495" y="164" fill="#94a3b8" font-size="15" font-weight="700">DETAIL</text>
 
-    <rect x="40" y="184" width="400" height="42" rx="7" fill="#4c1d95"/>
-    <text x="55" y="211" fill="#f5f3ff" font-size="17" font-weight="700">› Main model</text>
-    <text x="420" y="211" fill="#f5f3ff" font-size="16" text-anchor="end">claude-fable-5[1m]</text>
-    <text x="55" y="258" fill="#94a3b8" font-size="17">  Subagent model</text>
-    <text x="420" y="258" fill="#94a3b8" font-size="16" text-anchor="end">claude-sonnet-5</text>
-    <text x="55" y="305" fill="#94a3b8" font-size="17">  Advisor model</text>
-    <text x="420" y="305" fill="#64748b" font-size="16" text-anchor="end">&lt;inherit&gt;</text>
-    <text x="55" y="352" fill="#94a3b8" font-size="17">  Fallback models</text>
-    <text x="420" y="352" fill="#64748b" font-size="16" text-anchor="end">&lt;inherit&gt;</text>
+    <g filter="url(#shadow)">
+      <rect x="192" y="143" width="816" height="522" rx="14" fill="#0b1222" stroke="#22d3ee" stroke-width="2"/>
+      <text x="222" y="181" fill="#67e8f9" font-size="22" font-weight="700">Main model</text>
+      <text x="222" y="211" fill="#94a3b8" font-size="15">Choose an alias that follows your provider, a pinned preset, or an explicit custom ID.</text>
 
-    <text x="500" y="210" fill="#67e8f9" font-size="23" font-weight="700">Main model</text>
-    <text x="500" y="240" fill="#64748b" font-size="16">model</text>
-    <text x="500" y="292" fill="#64748b" font-size="14" font-weight="700">THIS SCOPE</text>
-    <text x="500" y="323" fill="#e2e8f0" font-size="18">claude-fable-5[1m]</text>
-    <text x="500" y="377" fill="#64748b" font-size="14" font-weight="700">EFFECTIVE</text>
-    <text x="500" y="408" fill="#e2e8f0" font-size="18">claude-fable-5[1m]</text>
-    <text x="500" y="435" fill="#64748b" font-size="14">source: global</text>
-    <text x="500" y="490" fill="#cbd5e1" font-size="17">Default model for new Claude Code</text>
-    <text x="500" y="519" fill="#cbd5e1" font-size="17">sessions. Aliases and custom provider</text>
-    <text x="500" y="548" fill="#cbd5e1" font-size="17">model IDs are accepted.</text>
-    <text x="500" y="596" fill="#64748b" font-size="15">Suggestions: default, fable, opus, sonnet, haiku</text>
+      <g font-size="15">
+        <text x="237" y="250" fill="#94a3b8">Default for account</text>
+        <text x="965" y="250" fill="#64748b" text-anchor="end">default</text>
+        <text x="237" y="283" fill="#94a3b8">Best available</text>
+        <text x="965" y="283" fill="#64748b" text-anchor="end">best</text>
+        <text x="237" y="316" fill="#94a3b8">Sonnet · latest</text>
+        <text x="965" y="316" fill="#64748b" text-anchor="end">sonnet</text>
+        <text x="237" y="349" fill="#94a3b8">Opus · latest</text>
+        <text x="965" y="349" fill="#64748b" text-anchor="end">opus</text>
+        <text x="237" y="382" fill="#94a3b8">Haiku · latest</text>
+        <text x="965" y="382" fill="#64748b" text-anchor="end">haiku</text>
+        <text x="237" y="415" fill="#94a3b8">Sonnet · 1M context</text>
+        <text x="965" y="415" fill="#64748b" text-anchor="end">sonnet[1m]</text>
+        <text x="237" y="448" fill="#94a3b8">Opus · 1M context</text>
+        <text x="965" y="448" fill="#64748b" text-anchor="end">opus[1m]</text>
+        <text x="237" y="481" fill="#94a3b8">Opus Plan → Sonnet Build</text>
+        <text x="965" y="481" fill="#64748b" text-anchor="end">opusplan</text>
 
-    <text x="28" y="682" fill="#64748b" font-size="14">↑↓ navigate   Enter edit   Space toggle   / search   u inherit   s save   ? help   q quit</text>
+        <rect x="212" y="496" width="776" height="38" rx="6" fill="url(#selected)"/>
+        <rect x="212" y="496" width="4" height="38" rx="2" fill="#67e8f9"/>
+        <text x="229" y="521" fill="#f5f3ff" font-weight="700">› Fable 5 · 1M</text>
+        <text x="965" y="521" fill="#ddd6fe" text-anchor="end">claude-fable-5[1m]</text>
+
+        <text x="237" y="559" fill="#94a3b8">Sonnet 5</text>
+        <text x="965" y="559" fill="#64748b" text-anchor="end">claude-sonnet-5</text>
+        <text x="237" y="592" fill="#c4b5fd">Custom model ID…</text>
+      </g>
+
+      <line x1="217" y1="615" x2="983" y2="615" stroke="#243147"/>
+      <text x="222" y="641" fill="#64748b" font-size="14">↑↓ choose   Enter apply   Esc cancel</text>
+    </g>
+
+    <text x="28" y="692" fill="#64748b" font-size="14">↑↓ navigate   Enter edit   Esc back   u inherit   s save   / search   ? help</text>
   </g>
 </svg>
