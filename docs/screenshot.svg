@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Claude Configurator terminal interface</title>
+  <desc id="desc">A dark terminal window showing global, project, and local Claude Code settings with categories, values, and details.</desc>
+  <rect width="1200" height="720" rx="22" fill="#070b16"/>
+  <rect x="1" y="1" width="1198" height="718" rx="21" fill="none" stroke="#27324a" stroke-width="2"/>
+  <circle cx="32" cy="30" r="7" fill="#fb7185"/>
+  <circle cx="56" cy="30" r="7" fill="#fbbf24"/>
+  <circle cx="80" cy="30" r="7" fill="#34d399"/>
+  <g font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace">
+    <text x="28" y="76" fill="#67e8f9" font-size="21" font-weight="700">CLAUDE CONFIG</text>
+    <text x="208" y="76" fill="#94a3b8" font-size="17">v0.1.0</text>
+    <text x="310" y="76" fill="#ddd6fe" font-size="17" font-weight="700">GLOBAL</text>
+    <text x="1170" y="76" fill="#64748b" font-size="15" text-anchor="end">~/.claude/settings.json</text>
+
+    <g font-size="16" fill="#94a3b8">
+      <text x="30" y="116" fill="#ddd6fe" font-weight="700">Models</text>
+      <text x="130" y="116">Reasoning</text>
+      <text x="252" y="116">Agents</text>
+      <text x="340" y="116">Permissions</text>
+      <text x="472" y="116">Safety</text>
+      <text x="554" y="116">Interface</text>
+      <text x="670" y="116">Behavior</text>
+    </g>
+    <rect x="25" y="130" width="430" height="510" rx="12" fill="#0b1222" stroke="#22d3ee" stroke-width="2"/>
+    <rect x="475" y="130" width="700" height="510" rx="12" fill="#0b1222" stroke="#334155" stroke-width="2"/>
+    <text x="45" y="164" fill="#67e8f9" font-size="15" font-weight="700">SETTINGS</text>
+    <text x="495" y="164" fill="#94a3b8" font-size="15" font-weight="700">DETAIL</text>
+
+    <rect x="40" y="184" width="400" height="42" rx="7" fill="#4c1d95"/>
+    <text x="55" y="211" fill="#f5f3ff" font-size="17" font-weight="700">› Main model</text>
+    <text x="420" y="211" fill="#f5f3ff" font-size="16" text-anchor="end">claude-fable-5[1m]</text>
+    <text x="55" y="258" fill="#94a3b8" font-size="17">  Subagent model</text>
+    <text x="420" y="258" fill="#94a3b8" font-size="16" text-anchor="end">claude-sonnet-5</text>
+    <text x="55" y="305" fill="#94a3b8" font-size="17">  Advisor model</text>
+    <text x="420" y="305" fill="#64748b" font-size="16" text-anchor="end">&lt;inherit&gt;</text>
+    <text x="55" y="352" fill="#94a3b8" font-size="17">  Fallback models</text>
+    <text x="420" y="352" fill="#64748b" font-size="16" text-anchor="end">&lt;inherit&gt;</text>
+
+    <text x="500" y="210" fill="#67e8f9" font-size="23" font-weight="700">Main model</text>
+    <text x="500" y="240" fill="#64748b" font-size="16">model</text>
+    <text x="500" y="292" fill="#64748b" font-size="14" font-weight="700">THIS SCOPE</text>
+    <text x="500" y="323" fill="#e2e8f0" font-size="18">claude-fable-5[1m]</text>
+    <text x="500" y="377" fill="#64748b" font-size="14" font-weight="700">EFFECTIVE</text>
+    <text x="500" y="408" fill="#e2e8f0" font-size="18">claude-fable-5[1m]</text>
+    <text x="500" y="435" fill="#64748b" font-size="14">source: global</text>
+    <text x="500" y="490" fill="#cbd5e1" font-size="17">Default model for new Claude Code</text>
+    <text x="500" y="519" fill="#cbd5e1" font-size="17">sessions. Aliases and custom provider</text>
+    <text x="500" y="548" fill="#cbd5e1" font-size="17">model IDs are accepted.</text>
+    <text x="500" y="596" fill="#64748b" font-size="15">Suggestions: default, fable, opus, sonnet, haiku</text>
+
+    <text x="28" y="682" fill="#64748b" font-size="14">↑↓ navigate   Enter edit   Space toggle   / search   u inherit   s save   ? help   q quit</text>
+  </g>
+</svg>
