@@ -15,7 +15,7 @@
 
   <g font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace">
     <text x="30" y="72" fill="#da7756" font-size="24" font-weight="700">✻  CLAUDE CONFIGURATOR</text>
-    <text x="356" y="72" fill="#898781" font-size="15">v0.3.0</text>
+    <text x="356" y="72" fill="#898781" font-size="15">v0.4.0</text>
     <text x="30" y="101" fill="#898781" font-size="14">Claude Code settings without hand-editing JSON</text>
     <text x="1170" y="101" fill="#898781" font-size="14" text-anchor="end">~/.claude/settings.json</text>
 

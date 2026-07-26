@@ -19,11 +19,15 @@
 - 包含当前 `fable`、`best`、`sonnet`、`opus` 和 `haiku` 别名，并在
   每个分层选择器中提供明确的**默认 / 继承**选项。
 - 配置推理、代理、权限、沙箱、界面和行为。
+- 使用类型化控件设置嵌套代理深度、子代理总数/并发数、工具并发、
+  交互式 `/init` 和共享任务列表。
+- Claude 风格状态栏可显示剩余上下文、真实 5 小时/7 天限额和重置倒计时。
 - TUI 可按系统语言自动切换英语、俄语或简体中文。
 - 使用 Claude Code 风格的暖色配色、清晰的标题层级，以及“控制什么 /
   为什么需要”的易懂说明。
 - 固定操作栏会一直显示保存、快捷键、继承来源、暂存修改和保存前 diff。
 - 检测写入冲突、自动备份，并拒绝覆盖无效 JSON。
+- 仅在用户确认后，从已验证的 GitHub Release 进行自更新。
 - 正确识别 Git 仓库和 worktree。
 - 为 macOS、Linux 和 Windows 提供单一原生二进制文件。
 
@@ -59,6 +63,8 @@ go install github.com/ex3lite/claude-configurator/cmd/claude-config@latest
 claude-config
 claude-config --scope global|project|local
 claude-config --project /path/to/project
+claude-config --no-update
+claude-config statusline --theme auto|claude|ansi|mono
 claude-config --help
 claude-config --version
 ```
@@ -114,12 +120,69 @@ gateway 或提供商特定部署；常规模型选择不会打开字符串输入
 色觉友好或终端 ANSI 主题。`~/.claude/themes/*.json` 中已有的自定义主题
 也会自动加入列表，无需手动输入主题名。
 
+### Claude CLI 设置
+
+打开独立的 **Claude CLI** 分类，配置
+[官方环境变量](https://code.claude.com/docs/en/env-vars)：
+
+| 设置 | Claude 默认值 | 要求 |
+|---|---:|---|
+| 嵌套子代理深度 | `1` | Claude Code 2.1.217+ |
+| 每会话子代理总数 | `200` | Claude Code 2.1.212+ |
+| 并发子代理数 | `20` | Claude Code 2.1.217+ |
+| 只读工具与子代理并发数 | `10` | 当前 Claude Code |
+| 交互式 `/init` | 关闭 | `CLAUDE_CODE_NEW_INIT=1` |
+| 共享任务列表 | 独立 | 在会话中使用相同 ID |
+
+数字通过已验证的预设选择；非标准限制可选择**自定义值…**并进行校验。
+它们会按 Claude Code 的要求作为字符串写入 `env`。重置会删除当前作用域
+中的环境变量并恢复继承。
+
+### Claude 风格状态栏
+
+选择 **Claude CLI → 状态栏主题**后会写入：
+
+![Claude 风格状态栏](docs/statusline.svg)
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "claude-config statusline --theme auto",
+    "refreshInterval": 60
+  }
+}
+```
+
+状态栏读取 Claude Code
+[官方 status-line JSON](https://code.claude.com/docs/en/statusline)，而不是抓取终端文本。它显示模型、项目、Git 分支、剩余上下文、本地时间、真实 5 小时/7 天剩余额度以及
+重置倒计时。第二行会在有数据时显示 session、agent、effort、thinking、
+fast、Vim 和输出风格。
+
+提供**自动**、Claude clay 真彩色、终端 ANSI 和单色主题。自动模式遵循
+`NO_COLOR`；窄终端会优先隐藏次要部分。Claude 只会在 Claude.ai Pro/Max
+订阅首次 API 响应后提供 `rate_limits`，缺失的窗口会被省略而不是伪造。
+重置**状态栏主题**会删除当前作用域的整个 `statusLine` 覆盖并恢复继承。
+
 ### 界面语言
 
 TUI 默认使用**自动**模式并跟随操作系统语言。在
 **界面 → 界面语言**中可以选择自动、English、Русский 或简体中文。
 该偏好保存在操作系统的 Claude Configurator 用户配置目录中，不会写入
 Claude Code 设置。
+
+### 自动更新
+
+正式发布的二进制文件会在 TUI 启动时检查最新稳定版
+[GitHub Release](https://github.com/ex3lite/claude-configurator/releases)。
+发现新版本后，会先显示本地化确认窗口；只有同意后才会下载当前系统的压缩包
+和 `checksums.txt`，验证 SHA-256，安全替换当前程序并自动重启。选择
+**稍后**会继续使用已安装版本。
+
+更新器只跟踪已发布版本，不跟踪仓库的 `main` 分支。`--help` 和
+`--version` 不会访问网络。单次启动可使用 `--no-update`；脚本或离线环境
+可设置 `CLAUDE_CONFIG_NO_UPDATE=1`。通过 `go install` 构建的版本显示为
+`dev`，继续由 Go 的包管理流程更新，不会自行替换。
 
 ### 快捷键
 
@@ -146,7 +209,8 @@ Claude Code 设置。
   每个文件保留最近 10 份。
 - 新建的 global 和 local 文件默认仅所有者可访问。
 - `bypassPermissions` 等危险设置需要二次确认。
-- 无遥测、无分析、无账户访问，运行时无网络请求。
+- 无遥测、无分析、无账户访问。唯一的自动网络请求是启动时读取公开的
+  GitHub Release 元数据；设置文件及其内容不会离开本机。
 
 ## 故障排除
 
@@ -155,6 +219,11 @@ Claude Code 设置。
 - JSON 无效：修复 `claude-config` 显示的位置，然后运行 `claude doctor`。
 - 保存被阻止：其他进程修改了文件。按 `r` 重新加载，检查后再次修改。
 - 不需要颜色：使用 `NO_COLOR=1 claude-config` 启动。
+- 状态栏没有限额：先发送一次 Claude 请求；这些字段只对受支持的
+  Claude.ai Pro/Max 订阅可用。
+- 状态栏未启动：确认 Claude Code 进程的 `PATH` 中可以找到
+  `claude-config`，然后重新选择主题。
+- 无法安装更新：确认 `claude-config` 所在目录可写，或重新运行安装脚本。
 
 ## 开发
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.4.0 — 2026-07-26
+
+- Added a localized startup check for the latest stable GitHub Release.
+- Added explicit consent before download or replacement.
+- Added platform-specific archive selection and SHA-256 verification against
+  the release `checksums.txt`.
+- Added safe executable replacement and automatic restart on macOS, Linux, and
+  Windows.
+- Added `--no-update` and `CLAUDE_CONFIG_NO_UPDATE=1` opt-outs; `--help`,
+  `--version`, and development builds remain network-free.
+- Added typed controls for nested-agent depth, total and concurrent subagent
+  limits, read-only tool concurrency, interactive `/init`, and shared task
+  lists.
+- Added a built-in Claude-style status-line renderer with Auto, Claude
+  true-color, ANSI, and monochrome themes.
+- Added live model, project, Git branch, context remaining, 5-hour/7-day
+  allowance, and reset countdowns from Claude Code's official status JSON.
+
 ## v0.3.0 — 2026-07-23
 
 - Reworked the TUI around Claude Code's warm clay palette with clearer

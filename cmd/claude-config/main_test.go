@@ -22,6 +22,15 @@ func TestVersionAndValidation(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
+	if code := run([]string{"--help"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("--help exit = %d", code)
+	}
+	if !strings.Contains(stderr.String(), "--no-update") {
+		t.Fatalf("--help does not document update opt-out: %q", stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
 	if code := run([]string{"--scope", "system"}, &stdout, &stderr); code != 2 {
 		t.Fatalf("invalid scope exit = %d", code)
 	}
@@ -37,5 +46,16 @@ func TestVersionAndValidation(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "invalid project path") {
 		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestStatuslineSubcommand(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	input := strings.NewReader(`{"model":{"display_name":"Fable 5"},"context_window":{"remaining_percentage":97}}`)
+	if code := runStatusline([]string{"--theme", "mono"}, input, &stdout, &stderr); code != 0 {
+		t.Fatalf("statusline exit = %d, stderr = %s", code, stderr.String())
+	}
+	if output := stdout.String(); !strings.Contains(output, "Fable 5") || !strings.Contains(output, "ctx:97% left") {
+		t.Fatalf("statusline output = %q", output)
 	}
 }

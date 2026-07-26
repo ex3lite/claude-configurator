@@ -20,12 +20,17 @@ anywhere.
 - Current `fable`, `best`, `sonnet`, `opus`, and `haiku` aliases, plus an
   explicit **Default / inherit** action in every scoped picker.
 - Reasoning, agents, permissions, sandbox, interface, and behavior settings.
+- Typed controls for nested-agent depth, total/concurrent subagent caps, tool
+  concurrency, interactive `/init`, and shared task lists.
+- Claude-style status bar themes with live context, 5-hour/7-day allowance,
+  and reset countdowns.
 - Auto-localized TUI in English, Russian, or Simplified Chinese.
 - Claude Code-inspired warm palette, clear title/subtitle hierarchy, and
   plain-language “what it controls / why you may need it” explanations.
 - Persistent action bar with Save, hotkeys, inherited-value/source display,
   staged changes, and diff before save.
 - Conflict detection, automatic backups, and protection against invalid JSON.
+- Consent-based self-updates from verified GitHub Release assets.
 - Git repository and worktree-aware paths.
 - One native binary for macOS, Linux, and Windows.
 
@@ -61,6 +66,8 @@ Prebuilt archives and checksums are also available on the
 claude-config
 claude-config --scope global|project|local
 claude-config --project /path/to/project
+claude-config --no-update
+claude-config statusline --theme auto|claude|ansi|mono
 claude-config --help
 claude-config --version
 ```
@@ -121,12 +128,76 @@ ANSI themes from a picker. Existing custom themes from `~/.claude/themes/*.json`
 are added to the same list automatically; theme selection does not require
 typing a string.
 
+### Claude CLI controls
+
+Open **Claude CLI** to configure the current
+[official environment controls](https://code.claude.com/docs/en/env-vars):
+
+| Setting | Claude default | Requirement |
+|---|---:|---|
+| Nested subagent depth | `1` | Claude Code 2.1.217+ |
+| Total subagents per session | `200` | Claude Code 2.1.212+ |
+| Concurrent subagents | `20` | Claude Code 2.1.217+ |
+| Read-only tool/subagent concurrency | `10` | Current Claude Code |
+| Interactive `/init` | Off | Enable with `CLAUDE_CODE_NEW_INIT=1` |
+| Shared task list | Separate | Give sessions the same task-list ID |
+
+Numeric settings use validated presets with an explicit custom-number option.
+They are stored as strings under `env`, as Claude Code expects. Resetting a
+setting removes the current scope's environment key and restores inheritance.
+
+### Claude-style status bar
+
+Choose **Claude CLI → Status bar theme** to install the built-in renderer:
+
+![Claude-style status bar](docs/statusline.svg)
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "claude-config statusline --theme auto",
+    "refreshInterval": 60
+  }
+}
+```
+
+The bar uses Claude Code's
+[official status-line JSON](https://code.claude.com/docs/en/statusline) rather
+than scraping the terminal. It shows the model, project, Git branch, remaining context, local
+time, and real 5-hour/7-day remaining allowance with time until reset. A second
+line adds session, agent, effort, thinking, fast, Vim, and output-style state
+when present.
+
+Themes are **Auto**, Claude clay true color, terminal ANSI, and monochrome.
+Auto honors `NO_COLOR`. The layout drops secondary segments first on narrow
+terminals. Rate-limit fields are available only to Claude.ai Pro/Max
+subscribers after the first API response; missing windows are simply omitted.
+Resetting **Status bar theme** removes the entire `statusLine` override from
+the selected scope so the lower scope is inherited.
+
 ### Interface language
 
 The TUI starts in **Auto** mode and follows the operating system language.
 Open **Interface → Interface language** to choose Auto, English, Русский, or
 简体中文. This preference is saved in the operating system's user configuration
 directory for Claude Configurator and is not written to Claude Code settings.
+
+### Automatic updates
+
+Release binaries check the latest stable
+[GitHub Release](https://github.com/ex3lite/claude-configurator/releases) when
+the TUI starts. If a newer version exists, a localized dialog asks before
+anything is downloaded. Accepting it downloads only the archive for the
+current operating system and `checksums.txt`, verifies SHA-256, replaces the
+running binary safely, and restarts Claude Configurator. Choosing **Later**
+continues with the installed version.
+
+The updater follows published releases, never the repository's `main` branch.
+`--help` and `--version` do not access the network. Use `--no-update` for one
+launch or set `CLAUDE_CONFIG_NO_UPDATE=1` to disable checks in scripts and
+offline environments. Builds produced by `go install` report `dev` and stay
+under Go's package-management flow instead of replacing themselves.
 
 ### Keyboard
 
@@ -156,7 +227,9 @@ directory for Claude Configurator and is not written to Claude Code settings.
 - Global and local files default to owner-only permissions.
 - Dangerous settings such as `bypassPermissions` require a second
   confirmation.
-- No telemetry, analytics, account access, or runtime network requests.
+- No telemetry, analytics, or account access. The only automatic network
+  request is the startup check for public GitHub Release metadata; settings
+  files and their values never leave the computer.
 
 ## Troubleshooting
 
@@ -167,6 +240,12 @@ directory for Claude Configurator and is not written to Claude Code settings.
 - A save is blocked: another process changed the file; press `r`, review the
   new value, and apply your change again.
 - Colors are unwanted: start with `NO_COLOR=1 claude-config`.
+- Status limits are absent: make one Claude request first; Claude exposes these
+  fields only for supported Claude.ai Pro/Max subscriptions.
+- The status bar does not start: ensure `claude-config` is on the `PATH` seen
+  by Claude Code, then select the theme again.
+- An update cannot be installed: ensure the directory containing
+  `claude-config` is writable, or rerun the installation script.
 
 ## Development
 

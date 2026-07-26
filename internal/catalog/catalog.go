@@ -9,21 +9,26 @@ const (
 	Boolean
 	Enum
 	List
+	Integer
 )
 
 type Spec struct {
-	ID          string
-	Path        string
-	Label       string
-	Category    string
-	Description string
-	Purpose     string
-	Kind        Kind
-	Options     []string
-	AllowCustom bool
-	MaxItems    int
-	Danger      map[string]string
-	App         bool
+	ID            string
+	Path          string
+	Label         string
+	Category      string
+	Description   string
+	Purpose       string
+	Kind          Kind
+	Options       []string
+	AllowCustom   bool
+	MaxItems      int
+	Min           int64
+	Max           int64
+	StoreAsString bool
+	Danger        map[string]string
+	App           bool
+	Hidden        bool
 }
 
 func (s Spec) Dangerous(value any) (string, bool) {
@@ -47,6 +52,18 @@ var Specs = []Spec{
 	{ID: "agent-teams", Path: "env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", Label: "Agent teams", Category: "Agents", Kind: Enum, Options: []string{"0", "1"}, Description: "Enable the experimental feature that lets several Claude agents coordinate on one task.", Purpose: "Use it when independent parts of a task can run in parallel; experimental behavior can still change."},
 	{ID: "teammate-mode", Path: "teammateMode", Label: "Teammate display", Category: "Agents", Kind: Enum, Options: []string{"in-process", "auto", "tmux", "iterm2"}, Description: "Choose where agent-team teammates are displayed.", Purpose: "Keep agents inline for a simple terminal, or use separate panes when you want to monitor each teammate."},
 	{ID: "agent-view", Path: "disableAgentView", Label: "Disable agent view", Category: "Agents", Kind: Boolean, Description: "Disable background agents, the agent view, and the on-demand supervisor.", Purpose: "Use this only when the background-agent interface is distracting or incompatible with your terminal."},
+
+	{ID: "subagent-depth", Path: "env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH", Label: "Subagent spawn depth", Category: "Claude CLI", Kind: Integer, Options: []string{"1", "2", "3", "4"}, AllowCustom: true, Min: 1, StoreAsString: true, Description: "Maximum number of subagent layers below the main conversation. The Claude Code default is 1; version 2.1.217 or newer is required.", Purpose: "Set 2 or higher only when delegated agents must split their own work. Each extra layer can multiply agent count and resource use."},
+	{ID: "subagent-total", Path: "env.CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION", Label: "Subagents per session", Category: "Claude CLI", Kind: Integer, Options: []string{"50", "100", "200", "300", "500"}, AllowCustom: true, Min: 1, StoreAsString: true, Description: "Total number of subagents one session may spawn. Claude Code defaults to 200; version 2.1.212 or newer is required.", Purpose: "Lower the cap to bound long autonomous runs, or raise it when a deliberate workflow legitimately needs more than 200 delegated tasks."},
+	{ID: "subagent-concurrent", Path: "env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS", Label: "Concurrent subagents", Category: "Claude CLI", Kind: Integer, Options: []string{"5", "10", "20", "30", "50"}, AllowCustom: true, Min: 1, StoreAsString: true, Description: "Maximum subagents that may run at the same time. Claude Code defaults to 20; version 2.1.217 or newer is required.", Purpose: "Control peak process and API pressure separately from the total number of subagents allowed during the session."},
+	{ID: "tool-concurrency", Path: "env.CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY", Label: "Tool concurrency", Category: "Claude CLI", Kind: Integer, Options: []string{"5", "10", "20", "30", "50"}, AllowCustom: true, Min: 1, StoreAsString: true, Description: "Maximum number of read-only tools and subagents that may execute in parallel. Claude Code defaults to 10.", Purpose: "Raise it for faster independent reads on a capable machine, or lower it to reduce load, rate spikes, and noisy parallel output."},
+	{ID: "new-init", Path: "env.CLAUDE_CODE_NEW_INIT", Label: "Interactive /init", Category: "Claude CLI", Kind: Enum, Options: []string{"1"}, Description: "Turn /init into an interactive setup flow for CLAUDE.md, skills, and hooks.", Purpose: "Use the guided flow when bootstrapping a project instead of accepting an automatically generated CLAUDE.md. Reset to inherit to disable it."},
+	{ID: "task-list-id", Path: "env.CLAUDE_CODE_TASK_LIST_ID", Label: "Shared task list ID", Category: "Claude CLI", Kind: String, Description: "Identifier used by multiple Claude Code sessions to share one task list.", Purpose: "Give cooperating terminal sessions the same ID when they need to coordinate progress through a common task list."},
+	{ID: "statusline-theme", Path: "statusLine.command", Label: "Status bar theme", Category: "Claude CLI", Kind: Enum, Options: []string{"claude-config statusline --theme auto", "claude-config statusline --theme claude", "claude-config statusline --theme ansi", "claude-config statusline --theme mono"}, AllowCustom: true, Description: "Claude-style bar above the input footer with model, project, Git branch, context left, and real 5-hour and 7-day usage windows.", Purpose: "Keep the limits and their reset countdown visible without parsing terminal output. Choose a built-in palette or provide your own status-line command."},
+	{ID: "statusline-refresh", Path: "statusLine.refreshInterval", Label: "Status bar refresh", Category: "Claude CLI", Kind: Integer, Options: []string{"5", "15", "30", "60"}, AllowCustom: true, Min: 1, Max: 3600, Description: "Seconds between status-line refreshes. Claude Code permits values from 1 second; 60 is enough for reset countdowns.", Purpose: "Refresh time-based limits while the session is idle without running the status command more often than necessary."},
+	{ID: "statusline-padding", Path: "statusLine.padding", Label: "Status bar padding", Category: "Claude CLI", Kind: Integer, Options: []string{"0", "1", "2", "4"}, AllowCustom: true, Min: 0, Max: 20, Description: "Extra horizontal indentation added by Claude Code before the custom status line.", Purpose: "Align the bar with your prompt and terminal layout without changing the rendered content."},
+	{ID: "statusline-vim", Path: "statusLine.hideVimModeIndicator", Label: "Hide built-in Vim mode", Category: "Claude CLI", Kind: Boolean, Description: "Hide Claude Code's built-in Vim mode indicator below the prompt.", Purpose: "Avoid a duplicated mode label if the custom status line already shows Vim state."},
+	{ID: "statusline-type", Path: "statusLine.type", Label: "Status line command type", Category: "Claude CLI", Kind: Enum, Options: []string{"command"}, Hidden: true, Description: "Internal Claude Code status-line command type.", Purpose: "Written automatically when a status bar theme is selected."},
 
 	{ID: "permission-mode", Path: "permissions.defaultMode", Label: "Default permission mode", Category: "Permissions", Kind: Enum, Options: []string{"default", "acceptEdits", "auto", "plan", "dontAsk", "bypassPermissions", "delegate"}, Description: "Default tool-approval behavior for new sessions.", Purpose: "Balance speed and safety by deciding when Claude must ask before it acts.", Danger: map[string]string{"bypassPermissions": "This skips permission prompts and can allow destructive actions."}},
 	{ID: "permission-allow", Path: "permissions.allow", Label: "Allow rules", Category: "Permissions", Kind: List, Description: "Tool rules that run without a confirmation prompt. Lists merge across scopes.", Purpose: "Reduce prompt fatigue for commands and paths you already trust."},
@@ -75,6 +92,9 @@ var Specs = []Spec{
 func Categories() []string {
 	var categories []string
 	for _, spec := range Specs {
+		if spec.Hidden {
+			continue
+		}
 		if len(categories) == 0 || categories[len(categories)-1] != spec.Category {
 			categories = append(categories, spec.Category)
 		}

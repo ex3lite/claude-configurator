@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
@@ -16,6 +19,7 @@ import (
 
 	"github.com/ex3lite/claude-configurator/internal/catalog"
 	"github.com/ex3lite/claude-configurator/internal/config"
+	"github.com/ex3lite/claude-configurator/internal/selfupdate"
 )
 
 type screen uint8
@@ -31,6 +35,8 @@ const (
 	confirmDanger
 	confirmQuit
 	confirmReload
+	confirmUpdate
+	installingUpdate
 )
 
 type inputPurpose uint8
@@ -73,6 +79,23 @@ type Model struct {
 	pendingSpec  catalog.Spec
 	pendingValue any
 	dangerText   string
+
+	updater        *selfupdate.Client
+	updateRelease  selfupdate.Release
+	updatePending  bool
+	preparedUpdate selfupdate.Prepared
+	updatePrepared bool
+}
+
+type updateCheckMsg struct {
+	release   selfupdate.Release
+	available bool
+	err       error
+}
+
+type updatePreparedMsg struct {
+	update selfupdate.Prepared
+	err    error
 }
 
 func New(workspace *config.Workspace, scope config.Scope, version string) *Model {
@@ -91,15 +114,49 @@ func New(workspace *config.Workspace, scope config.Scope, version string) *Model
 		drafts:       make(map[config.Scope]map[string]any, 3),
 	}
 	m.resetDrafts()
+	if from := os.Getenv("CLAUDE_CONFIG_UPDATED_FROM"); from != "" {
+		_ = os.Unsetenv("CLAUDE_CONFIG_UPDATED_FROM")
+		m.status = m.tr("status.updated", version)
+	}
 	return m
 }
 
-func (m *Model) Init() tea.Cmd { return nil }
+func (m *Model) EnableUpdates(client *selfupdate.Client) {
+	m.updater = client
+}
+
+func (m *Model) PreparedUpdate() (selfupdate.Prepared, bool) {
+	return m.preparedUpdate, m.updatePrepared
+}
+
+func (m *Model) Init() tea.Cmd {
+	if m.updater == nil {
+		return nil
+	}
+	return m.checkUpdate()
+}
 
 func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := message.(type) {
+	case updateCheckMsg:
+		if msg.err == nil && msg.available {
+			m.updateRelease = msg.release
+			m.updatePending = true
+			m.maybeOfferUpdate()
+		}
+		return m, nil
+	case updatePreparedMsg:
+		if msg.err != nil {
+			m.screen = browse
+			m.status = m.tr("update.failed", msg.err)
+			return m, nil
+		}
+		m.preparedUpdate = msg.update
+		m.updatePrepared = true
+		return m, tea.Quit
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.maybeOfferUpdate()
 		return m, nil
 	case tea.BackgroundColorMsg:
 		m.dark = msg.IsDark()
@@ -112,7 +169,9 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, tea.Quit
 		}
-		return m.handleKey(msg)
+		model, command := m.handleKey(msg)
+		m.maybeOfferUpdate()
+		return model, command
 	}
 	return m, nil
 }
@@ -151,10 +210,47 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		} else if isNo(msg) {
 			m.screen = browse
 		}
+	case confirmUpdate:
+		if isYes(msg) {
+			m.updatePending = false
+			m.screen = installingUpdate
+			return m, m.prepareUpdate()
+		} else if isNo(msg) {
+			m.updatePending = false
+			m.screen = browse
+			m.status = m.tr("update.later")
+		}
+	case installingUpdate:
+		// The download and checksum verification run in the background.
 	default:
 		return m.handleBrowseKey(msg)
 	}
 	return m, nil
+}
+
+func (m *Model) checkUpdate() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+		defer cancel()
+		release, available, err := m.updater.Check(ctx)
+		return updateCheckMsg{release: release, available: available, err: err}
+	}
+}
+
+func (m *Model) prepareUpdate() tea.Cmd {
+	release := m.updateRelease
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		update, err := m.updater.Prepare(ctx, release)
+		return updatePreparedMsg{update: update, err: err}
+	}
+}
+
+func (m *Model) maybeOfferUpdate() {
+	if m.updatePending && m.width >= 48 && m.height >= 16 && m.screen == browse && !m.anyDirty() {
+		m.screen = confirmUpdate
+	}
 }
 
 func (m *Model) handleBrowseKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -269,6 +365,16 @@ func (m *Model) openEditor() {
 		m.toggle(spec)
 	case catalog.Enum:
 		m.openChoice(spec, false, -1)
+	case catalog.Integer:
+		if len(spec.Options) > 0 {
+			m.openChoice(spec, false, -1)
+		} else {
+			value := ""
+			if current, _, ok := m.effective(spec); ok {
+				value = fmt.Sprint(current)
+			}
+			m.openInput(settingValue, spec, value, browse)
+		}
 	case catalog.List:
 		m.listSelected = 0
 		m.screen = editList
@@ -412,7 +518,15 @@ func (m *Model) handleChoiceKey(msg tea.KeyPressMsg) {
 			m.commitListValue(option)
 			return
 		}
-		m.propose(m.editSpec, option)
+		value := any(option)
+		if m.editSpec.Kind == catalog.Integer {
+			var ok bool
+			value, ok = m.integerValue(m.editSpec, option)
+			if !ok {
+				return
+			}
+		}
+		m.propose(m.editSpec, value)
 		if m.screen != confirmDanger {
 			m.screen = browse
 		}
@@ -422,6 +536,11 @@ func (m *Model) handleChoiceKey(msg tea.KeyPressMsg) {
 func (m *Model) unset(spec catalog.Spec) {
 	if spec.App {
 		m.setLanguage(languageAuto)
+		return
+	}
+	if spec.ID == "statusline-theme" {
+		config.Unset(m.drafts[m.scope], "statusLine")
+		m.status = m.tr("status.inherit", m.specLabel(spec.ID, spec.Label))
 		return
 	}
 	config.Unset(m.drafts[m.scope], spec.Path)
@@ -499,6 +618,7 @@ func (m *Model) openInput(purpose inputPurpose, spec catalog.Spec, value string,
 	m.input = []rune(value)
 	m.inputCursor = len(m.input)
 	m.returnScreen = returnTo
+	m.status = ""
 	m.screen = editText
 }
 
@@ -557,7 +677,15 @@ func (m *Model) commitInput() {
 		return
 	}
 	if m.inputPurpose == settingValue {
-		m.propose(m.editSpec, value)
+		setting := any(value)
+		if m.editSpec.Kind == catalog.Integer {
+			var ok bool
+			setting, ok = m.integerValue(m.editSpec, value)
+			if !ok {
+				return
+			}
+		}
+		m.propose(m.editSpec, setting)
 		if m.screen != confirmDanger {
 			m.screen = browse
 		}
@@ -565,6 +693,29 @@ func (m *Model) commitInput() {
 	}
 
 	m.commitListValue(value)
+}
+
+func (m *Model) integerValue(spec catalog.Spec, value string) (any, bool) {
+	for _, digit := range value {
+		if digit < '0' || digit > '9' {
+			m.status = m.tr("status.integer_min", spec.Min)
+			return nil, false
+		}
+	}
+	number, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || number < spec.Min {
+		m.status = m.tr("status.integer_min", spec.Min)
+		return nil, false
+	}
+	if spec.Max > 0 && number > spec.Max {
+		m.status = m.tr("status.integer_range", spec.Min, spec.Max)
+		return nil, false
+	}
+	normalized := strconv.FormatInt(number, 10)
+	if spec.StoreAsString {
+		return normalized, true
+	}
+	return json.Number(normalized), true
 }
 
 func (m *Model) propose(spec catalog.Spec, value any) {
@@ -588,6 +739,15 @@ func (m *Model) dangerMessage(spec catalog.Spec, value any, fallback string) str
 func (m *Model) setValue(spec catalog.Spec, value any) {
 	if spec.App {
 		m.setLanguage(uiLanguage(fmt.Sprint(value)))
+		return
+	}
+	if spec.ID == "statusline-theme" {
+		config.Set(m.drafts[m.scope], "statusLine.type", "command")
+		config.Set(m.drafts[m.scope], spec.Path, value)
+		if _, ok := config.Get(m.drafts[m.scope], "statusLine.refreshInterval"); !ok {
+			config.Set(m.drafts[m.scope], "statusLine.refreshInterval", json.Number("60"))
+		}
+		m.status = m.tr("status.staged", m.specLabel(spec.ID, spec.Label))
 		return
 	}
 	config.Set(m.drafts[m.scope], spec.Path, value)
@@ -743,6 +903,9 @@ func (m *Model) visibleSpecs() []catalog.Spec {
 	category := catalog.Categories()[m.category]
 	var specs []catalog.Spec
 	for _, spec := range catalog.Specs {
+		if spec.Hidden {
+			continue
+		}
 		if query == "" {
 			if spec.Category == category {
 				specs = append(specs, spec)
@@ -833,6 +996,15 @@ func (m *Model) View() tea.View {
 			content = m.renderConfirm(m.tr("confirm.quit.title"), m.tr("confirm.quit.text"), m.tr("confirm.quit.help"), true)
 		case confirmReload:
 			content = m.renderConfirm(m.tr("confirm.reload.title"), m.tr("confirm.reload.text"), m.tr("confirm.reload.help"), true)
+		case confirmUpdate:
+			content = m.renderUpdateConfirm()
+		case installingUpdate:
+			content = m.renderConfirm(
+				m.tr("update.installing.title"),
+				m.tr("update.installing.text", m.updateRelease.Version),
+				m.tr("update.installing.help"),
+				false,
+			)
 		default:
 			content = m.renderBrowser()
 		}
@@ -1032,7 +1204,7 @@ func (m *Model) renderCategoryMenu(width, height int) string {
 func (m *Model) categoryCount(category string) int {
 	count := 0
 	for _, spec := range catalog.Specs {
-		if spec.Category == category {
+		if spec.Category == category && !spec.Hidden {
 			count++
 		}
 	}
@@ -1206,7 +1378,11 @@ func (m *Model) renderTextEditor() string {
 		title = m.tr("search.title")
 		description = m.tr("search.description")
 	} else if m.editSpec.AllowCustom {
-		title = m.tr("editor.custom_model")
+		if strings.Contains(m.editSpec.ID, "model") {
+			title = m.tr("editor.custom_model")
+		} else {
+			title = m.tr("editor.custom_value", m.specLabel(m.editSpec.ID, m.editSpec.Label))
+		}
 	} else if m.inputPurpose == listItem {
 		title = m.tr("editor.edit", m.specLabel(m.editSpec.ID, m.editSpec.Label))
 	}
@@ -1215,8 +1391,11 @@ func (m *Model) renderTextEditor() string {
 	after := string(m.input[cursor:])
 	value := before + m.accent().Reverse(true).Render(" ") + after
 	body := wrap(description, m.modalContentWidth()) + "\n\n" +
-		m.inputStyle().Render(value) + "\n\n" +
-		m.muted().Render(m.tr("editor.apply"))
+		m.inputStyle().Render(value)
+	if m.status != "" {
+		body += "\n\n" + m.danger().Render(wrap(m.status, m.modalContentWidth()))
+	}
+	body += "\n\n" + m.muted().Render(m.tr("editor.apply"))
 	if len(m.editSpec.Options) > 0 && m.inputPurpose == settingValue {
 		var options []string
 		for _, option := range m.editSpec.Options {
@@ -1345,6 +1524,19 @@ func (m *Model) renderHelp() string {
 func (m *Model) renderConfirm(title, text, footer string, dangerous bool) string {
 	body := wrap(text, m.modalContentWidth()) + "\n\n" + m.muted().Render(footer)
 	return m.modal(title, body, dangerous)
+}
+
+func (m *Model) renderUpdateConfirm() string {
+	text := m.tr("update.confirm.text", m.updateRelease.Version)
+	if m.updateRelease.PageURL != "" {
+		text += "\n\n" + m.updateRelease.PageURL
+	}
+	return m.renderConfirm(
+		m.tr("update.confirm.title"),
+		text,
+		m.tr("update.confirm.help"),
+		false,
+	)
 }
 
 func (m *Model) modal(title, body string, dangerous bool) string {

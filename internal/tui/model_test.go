@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/ex3lite/claude-configurator/internal/catalog"
 	"github.com/ex3lite/claude-configurator/internal/config"
+	"github.com/ex3lite/claude-configurator/internal/selfupdate"
 )
 
 func TestStageAndSaveModel(t *testing.T) {
@@ -56,7 +58,7 @@ func TestStageAndSaveModel(t *testing.T) {
 
 func TestDangerousToggleRequiresConfirmation(t *testing.T) {
 	m := testModel(t)
-	m.category = 4 // Safety
+	m.category = 5 // Safety
 	m.focus = 1
 	m.selected = 0 // sandbox.enabled
 	press(m, textKey(" "))
@@ -73,6 +75,34 @@ func TestDangerousToggleRequiresConfirmation(t *testing.T) {
 	}
 }
 
+func TestUpdateRequiresConsent(t *testing.T) {
+	m := testModelWithSystemLanguage(t, "ru_RU.UTF-8")
+	m.updater = selfupdate.New("0.3.0")
+	release := selfupdate.Release{
+		Version: "0.4.0",
+		PageURL: "https://example.test/v0.4.0",
+	}
+	_, _ = m.Update(updateCheckMsg{release: release, available: true})
+	if m.screen != confirmUpdate {
+		t.Fatalf("screen = %v, want confirmUpdate", m.screen)
+	}
+	if content := m.View().Content; !strings.Contains(content, "0.4.0") ||
+		!strings.Contains(content, "проверить SHA-256") {
+		t.Fatalf("update confirmation is incomplete: %q", content)
+	}
+
+	press(m, textKey("n"))
+	if m.screen != browse || m.updatePrepared {
+		t.Fatal("declining an update prepared or installed it")
+	}
+
+	_, _ = m.Update(updateCheckMsg{release: release, available: true})
+	model, command := m.handleKey(special(tea.KeyEnter))
+	if model != m || command == nil || m.screen != installingUpdate {
+		t.Fatal("accepting an update did not start the download command")
+	}
+}
+
 func TestScopeSearchAndUnset(t *testing.T) {
 	m := testModel(t)
 	press(m, textKey("l"))
@@ -80,7 +110,7 @@ func TestScopeSearchAndUnset(t *testing.T) {
 		t.Fatalf("scope = %s", m.scope)
 	}
 	press(m, textKey("/"))
-	typeText(m, "subagent")
+	typeText(m, "SUBAGENT_MODEL")
 	press(m, special(tea.KeyEnter))
 	specs := m.visibleSpecs()
 	if len(specs) != 1 || specs[0].Path != "env.CLAUDE_CODE_SUBAGENT_MODEL" {
@@ -259,7 +289,7 @@ func TestThemeUsesBuiltInChoicePicker(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(themeDir, "dracula.json"), []byte(`{"base":"dark"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	m.category = 5 // Interface
+	m.category = 6 // Interface
 	m.focus = 1
 	for i, spec := range m.visibleSpecs() {
 		if spec.ID == "theme" {
@@ -283,6 +313,52 @@ func TestThemeUsesBuiltInChoicePicker(t *testing.T) {
 	press(m, special(tea.KeyEnter))
 	if got, _ := config.Get(m.drafts[config.Global], "theme"); got != "dark" {
 		t.Fatalf("staged theme = %v, want dark", got)
+	}
+}
+
+func TestClaudeCLISettingsUseTypedPickersAndResetStatusLine(t *testing.T) {
+	m := testModel(t)
+	m.category = slices.Index(catalog.Categories(), "Claude CLI")
+	m.focus = 1
+
+	selectSpec(t, m, "subagent-depth")
+	press(m, special(tea.KeyEnter))
+	selectChoice(t, m, "2")
+	press(m, special(tea.KeyEnter))
+	if got, _ := config.Get(m.drafts[config.Global], "env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH"); got != "2" {
+		t.Fatalf("spawn depth = %#v, want string 2", got)
+	}
+
+	selectSpec(t, m, "statusline-theme")
+	press(m, special(tea.KeyEnter))
+	command := "claude-config statusline --theme claude"
+	selectChoice(t, m, command)
+	press(m, special(tea.KeyEnter))
+	if got, _ := config.Get(m.drafts[config.Global], "statusLine.command"); got != command {
+		t.Fatalf("status command = %#v", got)
+	}
+	if got, _ := config.Get(m.drafts[config.Global], "statusLine.type"); got != "command" {
+		t.Fatalf("status type = %#v", got)
+	}
+	if got, _ := config.Get(m.drafts[config.Global], "statusLine.refreshInterval"); got != json.Number("60") {
+		t.Fatalf("refresh interval = %#v, want JSON number 60", got)
+	}
+
+	selectSpec(t, m, "statusline-refresh")
+	press(m, special(tea.KeyEnter))
+	selectChoice(t, m, customChoice)
+	press(m, special(tea.KeyEnter))
+	typeText(m, "0")
+	press(m, special(tea.KeyEnter))
+	if m.screen != editText || !strings.Contains(m.status, "greater than or equal") {
+		t.Fatalf("invalid integer was accepted: screen=%v status=%q", m.screen, m.status)
+	}
+	press(m, special(tea.KeyEscape))
+
+	selectSpec(t, m, "statusline-theme")
+	m.unset(m.visibleSpecs()[m.selected])
+	if _, ok := config.Get(m.drafts[config.Global], "statusLine"); ok {
+		t.Fatal("resetting the status bar did not restore inheritance")
 	}
 }
 
@@ -319,14 +395,16 @@ func TestDetailExplainsPurposeAndReset(t *testing.T) {
 	}
 }
 
-func TestEverySettingHasLocalizedPurpose(t *testing.T) {
+func TestEverySettingIsLocalized(t *testing.T) {
 	for _, spec := range catalog.Specs {
 		if spec.Purpose == "" {
 			t.Errorf("%s has no English purpose", spec.ID)
 		}
 		for _, language := range []uiLanguage{languageRU, languageZH} {
-			if translations[language]["spec."+spec.ID+".purpose"] == "" {
-				t.Errorf("%s has no %s purpose", spec.ID, language)
+			for _, field := range []string{"label", "description", "purpose"} {
+				if translations[language]["spec."+spec.ID+"."+field] == "" {
+					t.Errorf("%s has no %s %s", spec.ID, language, field)
+				}
 			}
 		}
 	}
@@ -375,7 +453,7 @@ func TestAutoLanguageAndPersistedInterfaceChoice(t *testing.T) {
 		t.Fatalf("auto-localized view is not Russian: %q", content)
 	}
 
-	m.category = 5 // Interface
+	m.category = 6 // Interface
 	m.focus = 1
 	for i, spec := range m.visibleSpecs() {
 		if spec.ID == "ui-language" {
@@ -468,4 +546,15 @@ func selectChoice(t *testing.T, m *Model, value string) {
 		t.Fatalf("choice %q not found in %#v", value, m.choiceOptions())
 	}
 	m.choice = index
+}
+
+func selectSpec(t *testing.T, m *Model, id string) {
+	t.Helper()
+	for i, spec := range m.visibleSpecs() {
+		if spec.ID == id {
+			m.selected = i
+			return
+		}
+	}
+	t.Fatalf("setting %q not found", id)
 }
