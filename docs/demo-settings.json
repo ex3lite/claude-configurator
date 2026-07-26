@@ -6,6 +6,7 @@
     "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "2",
     "CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION": "200"
   },
+  "theme": "dark-ansi",
   "effortLevel": "xhigh",
   "alwaysThinkingEnabled": true,
   "statusLine": {

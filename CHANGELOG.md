@@ -17,6 +17,8 @@
   check and an optional live Claude Code capture when the CLI is installed.
 - Strengthened the Claude clay, green, and violet palette and added a full-row
   selection state so the TUI no longer reads as monochrome.
+- Added separate English, Russian, and Simplified Chinese screenshot sets so
+  every localized README displays the matching interface language.
 
 ## v0.4.0 — 2026-07-26
 

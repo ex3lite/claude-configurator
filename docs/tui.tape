@@ -1,4 +1,4 @@
-Output "/tmp/claude-configurator-tui.gif"
+Output "__OUTPUT_GIF__"
 
 Set Shell "bash"
 Set Width 1400
@@ -14,27 +14,27 @@ Set CursorBlink false
 Set TypingSpeed 0
 Set Theme { "name": "Claude", "black": "#171716", "red": "#c2413b", "green": "#678f69", "yellow": "#c68443", "blue": "#8b6fb1", "magenta": "#9b72cf", "cyan": "#d97757", "white": "#e8e5df", "brightBlack": "#7c7774", "brightRed": "#e05b52", "brightGreen": "#7fa581", "brightYellow": "#dda15e", "brightBlue": "#aa8bd1", "brightMagenta": "#b991e2", "brightCyan": "#e38b6d", "brightWhite": "#ffffff", "background": "#1f1f1d", "foreground": "#d7d2ca", "selection": "#4a332b", "cursor": "#d97757" }
 
-Env LC_ALL "ru_RU.UTF-8"
-Env LANG "ru_RU.UTF-8"
+Env LC_ALL "__LOCALE__"
+Env LANG "__LOCALE__"
 Env TERM "xterm-256color"
 Env COLORTERM "truecolor"
 Env NO_COLOR ""
 Env CLAUDE_CONFIG_NERD_FONT "1"
 
 Hide
-Type "rm -rf /tmp/claude-configurator-demo && mkdir -p /tmp/claude-configurator-demo/home/.claude /tmp/claude-configurator-demo/config /tmp/claude-configurator-demo/project && cp docs/demo-settings.json /tmp/claude-configurator-demo/home/.claude/settings.json && clear"
+Type "rm -rf __DEMO_ROOT__ && mkdir -p __DEMO_ROOT__/home/.claude __DEMO_ROOT__/config __DEMO_ROOT__/project && cp docs/demo-settings.json __DEMO_ROOT__/home/.claude/settings.json && clear"
 Enter
 Wait
 Show
-Type "HOME=/tmp/claude-configurator-demo/home XDG_CONFIG_HOME=/tmp/claude-configurator-demo/config ./bin/claude-config --no-update --project /tmp/claude-configurator-demo/project"
+Type "HOME=__DEMO_ROOT__/home XDG_CONFIG_HOME=__DEMO_ROOT__/config ./bin/claude-config --no-update --project __DEMO_ROOT__/project"
 Enter
-Wait+Screen /ГЛАВНОЕ МЕНЮ/
+Wait+Screen /__MAIN_WAIT__/
 Sleep 500ms
-Screenshot docs/tui-main.png
+Screenshot "__OUTPUT_DIR__/tui-main.png"
 Sleep 500ms
 Enter
-Wait+Screen /НАСТРОЙКИ/
+Wait+Screen /__SETTINGS_WAIT__/
 Sleep 500ms
-Screenshot docs/tui-models.png
+Screenshot "__OUTPUT_DIR__/tui-models.png"
 Sleep 500ms
 Ctrl+C

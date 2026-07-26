@@ -10,7 +10,7 @@
 Code. Работает локально, не использует промпты и никуда не отправляет
 конфигурацию.
 
-![Интерфейс Claude Configurator](docs/tui-main.png)
+![Интерфейс Claude Configurator](docs/screenshots/ru/tui-main.png)
 
 ## Возможности
 
@@ -133,7 +133,7 @@ provider-конфигураций; обычный выбор модели бол
 Подробнее — в
 [официальной документации моделей](https://code.claude.com/docs/en/model-config).
 
-![Fable 5 как основная модель и Sonnet 5 для сабагентов](docs/tui-models.png)
+![Fable 5 как основная модель и Sonnet 5 для сабагентов](docs/screenshots/ru/tui-models.png)
 
 ### Наследование, сброс и сохранение
 
@@ -176,7 +176,7 @@ global, managed или стандартное разрешение Claude. Фи�
 
 Выберите **Claude CLI → Тема статус-бара**. Конфигуратор запишет:
 
-![Статус-бар с локальными датами сброса](docs/statusline-limits.png)
+![Статус-бар с локальными датами сброса](docs/screenshots/ru/statusline-limits.png)
 
 ```json
 {
@@ -209,7 +209,7 @@ override `statusLine` на выбранном уровне.
 Настоящий input bar Claude Code, автоматически снятый в изолированном
 `demo-project`:
 
-![Input bar Claude Code со строкой Claude Configurator](docs/claude-cli-statusline.png)
+![Input bar Claude Code со строкой Claude Configurator](docs/screenshots/ru/claude-cli-statusline.png)
 
 ### Язык интерфейса
 
@@ -294,8 +294,10 @@ go run ./cmd/claude-config
 
 Скрипт скриншотов собирает текущий TUI, записывает реальные терминальные сессии
 через [VHS](https://github.com/charmbracelet/vhs) и проверяет наличие
-оранжевых акцентов Claude. Если Claude Code установлен, он также автоматически
-снимает настоящий input bar во временном `demo-project`; в публикуемый crop не
+оранжевых акцентов Claude. Он создаёт отдельные наборы для английского,
+русского и упрощённого китайского. Если Claude Code установлен, скрипт также
+автоматически снимает каждый локализованный input bar во временном
+`demo-project`; в публикуемый crop не
 попадают welcome-панель, аккаунт и домашний путь. Для получения официальных
 полей лимитов live-захват отправляет один минимальный запрос `Reply only: OK`;
 отключить его можно через `CLAUDE_CONFIG_CAPTURE_LIVE=0`. Workflow

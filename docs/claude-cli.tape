@@ -17,15 +17,15 @@ Set Theme { "name": "Claude", "black": "#171716", "red": "#c2413b", "green": "#6
 Env TERM "xterm-256color"
 Env COLORTERM "truecolor"
 Env NO_COLOR ""
-Env LC_ALL "ru_RU.UTF-8"
-Env LANG "ru_RU.UTF-8"
+Env LC_ALL "__LOCALE__"
+Env LANG "__LOCALE__"
 
 Hide
-Type "cd __DEMO_DIR__; export PATH=__BINARY_DIR__:$PATH; clear; claude --name screenshot-demo --settings __SETTINGS_FILE__"
+Type "cd __DEMO_DIR__; export PATH=__BINARY_DIR__:$PATH; clear; claude --name demo --no-chrome --setting-sources '' --settings __SETTINGS_FILE__"
 Enter
 Wait+Screen /Quick safety check/
 Enter
-Wait+Screen /лимиты:/
+Wait+Screen /__LIMITS_WAIT__/
 Type "Reply only: OK"
 Enter
 Wait+Screen /5h/

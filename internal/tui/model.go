@@ -1085,7 +1085,7 @@ func (m *Model) renderHeader() string {
 	subtitle := m.muted().Render(truncate(m.tr("header.subtitle"), m.width))
 	second := subtitle
 	if m.width >= 88 {
-		path := m.workspace.Paths.For(m.scope)
+		path := displayPath(m.workspace.Paths.For(m.scope))
 		right := m.muted().Render(truncate(path, max(18, m.width/2)))
 		leftWidth := max(16, m.width-lipgloss.Width(right)-2)
 		left := m.muted().Render(truncate(m.tr("header.subtitle"), leftWidth))
@@ -1674,6 +1674,21 @@ func truncate(text string, width int) string {
 		text = text[size:]
 	}
 	return out.String() + "…"
+}
+
+func displayPath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return path
+	}
+	if path == home {
+		return "~"
+	}
+	prefix := home + string(filepath.Separator)
+	if strings.HasPrefix(path, prefix) {
+		return "~" + string(filepath.Separator) + strings.TrimPrefix(path, prefix)
+	}
+	return path
 }
 
 func wrap(text string, width int) string {

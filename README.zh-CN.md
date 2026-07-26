@@ -9,7 +9,7 @@
 一个快速的终端界面，用于全局或按项目编辑 Claude Code 设置。它完全在本地运行，
 不依赖提示词，也不会将配置发送到任何地方。
 
-![Claude Configurator 界面](docs/tui-main.png)
+![Claude Configurator 界面](docs/screenshots/zh-CN/tui-main.png)
 
 ## 功能
 
@@ -123,7 +123,7 @@ agent teams 和 workflow agents，并覆盖单个代理内的模型选择。保�
 gateway 或提供商特定部署；常规模型选择不会打开字符串输入框。详见
 [官方模型配置文档](https://code.claude.com/docs/en/model-config)。
 
-![Fable 5 主模型与 Sonnet 5 子代理](docs/tui-models.png)
+![Fable 5 主模型与 Sonnet 5 子代理](docs/screenshots/zh-CN/tui-models.png)
 
 ### 继承、重置与保存
 
@@ -163,7 +163,7 @@ gateway 或提供商特定部署；常规模型选择不会打开字符串输入
 
 选择 **Claude CLI → 状态栏主题**后会写入：
 
-![带本地重置时间的 Claude 风格状态栏](docs/statusline-limits.png)
+![带本地重置时间的 Claude 风格状态栏](docs/screenshots/zh-CN/statusline-limits.png)
 
 ```json
 {
@@ -191,7 +191,7 @@ gateway 或提供商特定部署；常规模型选择不会打开字符串输入
 
 以下是真实 Claude Code input bar，由脚本在隔离的 `demo-project` 中自动截取：
 
-![带 Claude Configurator 状态栏的 Claude Code input bar](docs/claude-cli-statusline.png)
+![带 Claude Configurator 状态栏的 Claude Code input bar](docs/screenshots/zh-CN/claude-cli-statusline.png)
 
 ### 界面语言
 
@@ -269,8 +269,9 @@ go run ./cmd/claude-config
 
 截图脚本会构建当前 TUI，通过
 [VHS](https://github.com/charmbracelet/vhs) 录制真实终端会话，并检查
-Claude 橙色强调色是否存在。若已安装 Claude Code，它还会在临时
-`demo-project` 中自动截取真实 input bar；发布的裁剪图不会包含欢迎面板、
+Claude 橙色强调色是否存在。它会分别生成英语、俄语和简体中文截图集。
+若已安装 Claude Code，它还会在临时 `demo-project` 中自动截取每种语言的
+真实 input bar；发布的裁剪图不会包含欢迎面板、
 账户信息或用户主目录路径。为了获取 Claude 官方的限额字段，实时截取会发送
 一次最小请求 `Reply only: OK`；可通过 `CLAUDE_CONFIG_CAPTURE_LIVE=0`
 关闭。`Refresh screenshots` 工作流会在每次更新 `main` 时运行，并自动提交

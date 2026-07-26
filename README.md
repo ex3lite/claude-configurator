@@ -10,7 +10,7 @@ A fast terminal UI for editing Claude Code settings globally or per project. It
 works locally, does not use prompts, and never sends your configuration
 anywhere.
 
-![Claude Configurator TUI](docs/tui-main.png)
+![Claude Configurator TUI](docs/screenshots/en/tui-main.png)
 
 ## Features
 
@@ -130,7 +130,7 @@ the last explicit option for gateways and provider-specific deployments;
 ordinary model selection never opens a string field. See the
 [official model configuration](https://code.claude.com/docs/en/model-config).
 
-![Fable 5 main model and Sonnet 5 subagents](docs/tui-models.png)
+![Fable 5 main model and Sonnet 5 subagents](docs/screenshots/en/tui-models.png)
 
 ### Inheritance, reset, and save
 
@@ -172,7 +172,7 @@ setting removes the current scope's environment key and restores inheritance.
 
 Choose **Claude CLI → Status bar theme** to install the built-in renderer:
 
-![Claude-style status bar with local reset dates](docs/statusline-limits.png)
+![Claude-style status bar with local reset dates](docs/screenshots/en/statusline-limits.png)
 
 ```json
 {
@@ -206,7 +206,7 @@ the selected scope so the lower scope is inherited.
 Real Claude Code input bar captured automatically in an isolated
 `demo-project`:
 
-![Claude Code input bar with Claude Configurator status line](docs/claude-cli-statusline.png)
+![Claude Code input bar with Claude Configurator status line](docs/screenshots/en/claude-cli-statusline.png)
 
 ### Interface language
 
@@ -294,8 +294,9 @@ go run ./cmd/claude-config
 
 The screenshot script builds the current TUI, records deterministic real
 terminal sessions with [VHS](https://github.com/charmbracelet/vhs), and checks
-that Claude-orange accents are present. When an installed Claude Code session
-is available, it also captures the real input bar inside a temporary
+that Claude-orange accents are present. It produces separate English, Russian,
+and Simplified Chinese sets. When an installed Claude Code session is
+available, it also captures each localized real input bar inside a temporary
 `demo-project`; the published crop never includes the welcome panel, account,
 or home path. Live capture sends one minimal `Reply only: OK` request so Claude
 supplies its official rate-limit fields; set `CLAUDE_CONFIG_CAPTURE_LIVE=0` to

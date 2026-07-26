@@ -35,11 +35,8 @@ fi
 demo_version="$(awk '/^## v/{print $2; exit}' CHANGELOG.md)"
 go build -ldflags "-s -w -X main.version=${demo_version}" -o bin/claude-config ./cmd/claude-config
 
-tui_tape="$(mktemp)"
-status_tape="$(mktemp)"
-trap 'rm -f "$tui_tape" "$status_tape"' EXIT INT TERM
-sed "s|__NERD_FONT__|${screenshot_font}|g" docs/tui.tape >"$tui_tape"
-sed "s|__NERD_FONT__|${screenshot_font}|g" docs/statusline.tape >"$status_tape"
+temp_root="$(mktemp -d)"
+trap 'rm -rf "$temp_root"' EXIT INT TERM
 
 record() {
   tape="$1"
@@ -60,15 +57,44 @@ record() {
   return 1
 }
 
-rm -f docs/tui-main.png docs/tui-models.png docs/statusline-limits.png
-record "$tui_tape" docs/tui-main.png docs/tui-models.png
-record "$status_tape" docs/statusline-limits.png
-for screenshot in docs/tui-main.png docs/tui-models.png docs/statusline-limits.png; do
-  if [ ! -s "$screenshot" ]; then
-    echo "Screenshot was not generated: ${screenshot}" >&2
-    exit 1
-  fi
-done
+render_locale() {
+  language="$1"
+  locale="$2"
+  main_wait="$3"
+  settings_wait="$4"
+  status_wait="$5"
+  output_dir="docs/screenshots/${language}"
+  demo_root="${temp_root}/demo-${language}"
+  tui_tape="${temp_root}/tui-${language}.tape"
+  status_tape="${temp_root}/status-${language}.tape"
+  mkdir -p "$output_dir"
+
+  sed \
+    -e "s|__NERD_FONT__|${screenshot_font}|g" \
+    -e "s|__LOCALE__|${locale}|g" \
+    -e "s|__MAIN_WAIT__|${main_wait}|g" \
+    -e "s|__SETTINGS_WAIT__|${settings_wait}|g" \
+    -e "s|__DEMO_ROOT__|${demo_root}|g" \
+    -e "s|__OUTPUT_DIR__|${output_dir}|g" \
+    -e "s|__OUTPUT_GIF__|${temp_root}/tui-${language}.gif|g" \
+    docs/tui.tape >"$tui_tape"
+  sed \
+    -e "s|__NERD_FONT__|${screenshot_font}|g" \
+    -e "s|__LOCALE__|${locale}|g" \
+    -e "s|__STATUS_WAIT__|${status_wait}|g" \
+    -e "s|__OUTPUT_DIR__|${output_dir}|g" \
+    -e "s|__OUTPUT_GIF__|${temp_root}/status-${language}.gif|g" \
+    docs/statusline.tape >"$status_tape"
+
+  rm -f "${output_dir}/tui-main.png" "${output_dir}/tui-models.png" "${output_dir}/statusline-limits.png"
+  record "$tui_tape" "${output_dir}/tui-main.png" "${output_dir}/tui-models.png"
+  record "$status_tape" "${output_dir}/statusline-limits.png"
+}
+
+render_locale en "en_US.UTF-8" "MAIN MENU" "SETTINGS" "used"
+render_locale ru "ru_RU.UTF-8" "ГЛАВНОЕ МЕНЮ" "НАСТРОЙКИ" "исп."
+render_locale zh-CN "zh_CN.UTF-8" "主菜单" "设置" "已用"
+rm -f docs/tui-main.png docs/tui-models.png docs/statusline-limits.png docs/claude-cli-statusline.png
 
 warm_pixels() {
   ffmpeg -v error -i "$1" -f rawvideo -pix_fmt rgb24 - |
@@ -87,17 +113,34 @@ if [ "${CLAUDE_CONFIG_CAPTURE_LIVE:-auto}" != "0" ] && command -v claude >/dev/n
     echo "Live Claude Code screenshot was not refreshed; keeping the last verified image." >&2
   fi
 fi
-for screenshot in docs/tui-main.png docs/statusline-limits.png docs/claude-cli-statusline.png; do
-  if [ ! -s "$screenshot" ] ||
-    [ "$(warm_pixels "$screenshot")" -lt 500 ]; then
-    echo "Screenshot color check failed: Claude orange is missing from ${screenshot}." >&2
-    exit 1
-  fi
+for language in en ru zh-CN; do
+  output_dir="docs/screenshots/${language}"
+  for screenshot in \
+    "${output_dir}/tui-main.png" \
+    "${output_dir}/tui-models.png" \
+    "${output_dir}/statusline-limits.png" \
+    "${output_dir}/claude-cli-statusline.png"; do
+    if [ ! -s "$screenshot" ]; then
+      echo "Screenshot was not generated: ${screenshot}" >&2
+      exit 1
+    fi
+  done
+  for screenshot in \
+    "${output_dir}/tui-main.png" \
+    "${output_dir}/statusline-limits.png" \
+    "${output_dir}/claude-cli-statusline.png"; do
+    if [ "$(warm_pixels "$screenshot")" -lt 500 ]; then
+      echo "Screenshot color check failed: Claude orange is missing from ${screenshot}." >&2
+      exit 1
+    fi
+  done
+  for screenshot in \
+    "${output_dir}/statusline-limits.png" \
+    "${output_dir}/claude-cli-statusline.png"; do
+    if [ "$(green_pixels "$screenshot")" -lt 500 ]; then
+      echo "Screenshot color check failed: status green is missing from ${screenshot}." >&2
+      exit 1
+    fi
+  done
 done
-for screenshot in docs/statusline-limits.png docs/claude-cli-statusline.png; do
-  if [ "$(green_pixels "$screenshot")" -lt 500 ]; then
-    echo "Screenshot color check failed: status green is missing from ${screenshot}." >&2
-    exit 1
-  fi
-done
-echo "Updated docs/tui-main.png, docs/tui-models.png, and docs/statusline-limits.png using ${screenshot_font}."
+echo "Updated localized English, Russian, and Simplified Chinese screenshots using ${screenshot_font}."

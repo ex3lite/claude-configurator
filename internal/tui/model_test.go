@@ -513,6 +513,15 @@ func TestCategoryMenuScrollsToSelection(t *testing.T) {
 	}
 }
 
+func TestDisplayPathCollapsesHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	path := filepath.Join(home, ".claude", "settings.json")
+	if got := displayPath(path); got != filepath.Join("~", ".claude", "settings.json") {
+		t.Fatalf("displayPath() = %q", got)
+	}
+}
+
 func testModel(t *testing.T) *Model {
 	return testModelWithSystemLanguage(t, "en_US.UTF-8")
 }
