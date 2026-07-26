@@ -22,10 +22,30 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - uses: charmbracelet/vhs-action@59641cdc7fadf3978db65eb8c6937ea2752f4ec3
-        with:
-          version: v0.11.0
-          install-fonts: true
+      - name: Install verified screenshot tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg fontconfig jq ttyd unzip
+
+          vhs_archive="$RUNNER_TEMP/vhs.tar.gz"
+          curl -fsSL \
+            https://github.com/charmbracelet/vhs/releases/download/v0.11.0/vhs_0.11.0_Linux_x86_64.tar.gz \
+            -o "$vhs_archive"
+          echo "99cb634587eaae0473c1ea377db80c3a048c27f99fe0a7febb1a1e8cb7ee5009  $vhs_archive" |
+            sha256sum --check
+          tar -xzf "$vhs_archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/vhs_0.11.0_Linux_x86_64" >> "$GITHUB_PATH"
+
+          font_archive="$RUNNER_TEMP/Meslo.zip"
+          font_dir="$HOME/.local/share/fonts/claude-configurator"
+          curl -fsSL \
+            https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/Meslo.zip \
+            -o "$font_archive"
+          echo "13b502ac8c2bd9d3161018064560e23cd42b175bb730780a270975265a19ad57  $font_archive" |
+            sha256sum --check
+          mkdir -p "$font_dir"
+          unzip -q "$font_archive" "MesloLGSNerdFontMono-*.ttf" -d "$font_dir"
+          fc-cache -f "$font_dir"
       - run: ./scripts/update-screenshots.sh
       - name: Commit refreshed screenshots
         run: |
