@@ -37,4 +37,12 @@ Wait+Screen /__SETTINGS_WAIT__/
 Sleep 500ms
 Screenshot "__OUTPUT_DIR__/tui-models.png"
 Sleep 500ms
+Down
+Down
+Down
+Enter
+Wait+Screen /__FALLBACK_WAIT__/
+Sleep 500ms
+Screenshot "__OUTPUT_DIR__/tui-fallback.png"
+Sleep 500ms
 Ctrl+C

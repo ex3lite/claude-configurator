@@ -18,6 +18,8 @@
   常规模型无需手动输入。
 - 包含当前 `fable`、`best`、`sonnet`、`opus` 和 `haiku` 别名，并在
   每个分层选择器中提供明确的**默认 / 继承**选项。
+- 为 `permissions.allow`、`ask` 和 `deny` 提供本地化预设，并在选择前
+  显示准确的 Claude Code 规则。
 - 配置推理、代理、权限、沙箱、界面和行为。
 - 使用类型化控件设置嵌套代理深度、子代理总数/并发数、工具并发、
   交互式 `/init` 和共享任务列表。
@@ -124,6 +126,15 @@ gateway 或提供商特定部署；常规模型选择不会打开字符串输入
 [官方模型配置文档](https://code.claude.com/docs/en/model-config)。
 
 ![Fable 5 主模型与 Sonnet 5 子代理](docs/screenshots/zh-CN/tui-models.png)
+
+### 后备模型与权限列表
+
+打开空的后备模型链或权限列表时，现在会直接显示实用选项，不再进入空白编辑器。
+后备模型包含账户默认值、Fable、Sonnet、Opus、Haiku 和自定义提供商 ID。
+权限预设使用 Claude Code 的 `Tool` / `Tool(specifier)` 语法，并始终显示
+原始规则；项目专用规则仍可通过**自定义值…**输入。
+
+![后备模型选择器](docs/screenshots/zh-CN/tui-fallback.png)
 
 ### 继承、重置与保存
 

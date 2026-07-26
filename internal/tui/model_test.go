@@ -439,18 +439,56 @@ func TestFallbackModelsUseChoicePicker(t *testing.T) {
 	m.focus = 1
 	m.selected = 3
 	press(m, special(tea.KeyEnter))
-	if m.screen != editList {
-		t.Fatalf("fallback editor screen = %v, want editList", m.screen)
-	}
-	press(m, textKey("a"))
 	if m.screen != editChoice {
-		t.Fatalf("fallback add screen = %v, want editChoice", m.screen)
+		t.Fatalf("fallback editor screen = %v, want editChoice", m.screen)
 	}
+	if !slices.Contains(m.choiceOptions(), "default") || !slices.Contains(m.choiceOptions(), "fable") {
+		t.Fatalf("fallback options = %#v", m.choiceOptions())
+	}
+	press(m, special(tea.KeyEscape))
+	if m.screen != browse {
+		t.Fatalf("cancelling the initial picker returned to %v, want browse", m.screen)
+	}
+	press(m, special(tea.KeyEnter))
 	selectChoice(t, m, "sonnet")
 	press(m, special(tea.KeyEnter))
 	items := m.ownList(m.editSpec)
 	if len(items) != 1 || items[0] != "sonnet" {
 		t.Fatalf("fallback models = %#v", items)
+	}
+}
+
+func TestPermissionListOffersLocalizedTemplatesAndCanInherit(t *testing.T) {
+	m := testModelWithSystemLanguage(t, "ru_RU.UTF-8")
+	m.category = slices.Index(catalog.Categories(), "Permissions")
+	m.focus = 1
+	selectSpec(t, m, "permission-deny")
+
+	press(m, special(tea.KeyEnter))
+	if m.screen != editChoice {
+		t.Fatalf("empty permission editor screen = %v, want editChoice", m.screen)
+	}
+	if !slices.Contains(m.choiceOptions(), "Read(./.env)") ||
+		!slices.Contains(m.choiceOptions(), customChoice) {
+		t.Fatalf("permission options = %#v", m.choiceOptions())
+	}
+	if content := m.View().Content; !strings.Contains(content, "Блокировать файл .env") ||
+		!strings.Contains(content, "Read(./.env)") {
+		t.Fatalf("permission preset lacks a localized explanation and raw rule: %q", content)
+	}
+
+	selectChoice(t, m, "Read(./.env)")
+	press(m, special(tea.KeyEnter))
+	if got := m.ownList(m.editSpec); len(got) != 1 || got[0] != "Read(./.env)" {
+		t.Fatalf("staged deny rules = %#v", got)
+	}
+	press(m, textKey("u"))
+	if _, ok := config.Get(m.drafts[config.Global], "permissions.deny"); ok {
+		t.Fatal("u did not remove the list and restore inheritance")
+	}
+	if content := m.View().Content; !strings.Contains(content, "встроенное поведение") ||
+		!strings.Contains(content, "Выбрать готовый вариант") {
+		t.Fatalf("empty list does not explain the default and next action: %q", content)
 	}
 }
 

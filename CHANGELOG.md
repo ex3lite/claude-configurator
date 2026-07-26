@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.6.0 — 2026-07-26
+
+- Replaced blank fallback and permission list entry screens with immediate,
+  localized pickers.
+- Added the account default to fallback models and ready permission templates
+  using Claude Code's documented `Tool` / `Tool(specifier)` syntax.
+- Added plain-language purpose text, raw permission-rule previews, inherited
+  effective values, and a visible empty-state action.
+- Added `U` reset-to-inherit support inside list editors.
+- Added an automated, localized screenshot of the real fallback picker.
+
 ## v0.5.0 — 2026-07-26
 
 - Added dedicated 5-hour and 7-day limit rows with progress bars, used and

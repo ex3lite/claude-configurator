@@ -379,7 +379,11 @@ func (m *Model) openEditor() {
 		}
 	case catalog.List:
 		m.listSelected = 0
-		m.screen = editList
+		if len(m.ownList(spec)) == 0 && len(spec.Options) > 0 {
+			m.openChoice(spec, true, -1)
+		} else {
+			m.screen = editList
+		}
 	default:
 		value := ""
 		if current, _, ok := m.effective(spec); ok {
@@ -492,7 +496,11 @@ func (m *Model) handleChoiceKey(msg tea.KeyPressMsg) {
 	switch msg.String() {
 	case "esc", "q":
 		if m.choiceForList {
-			m.screen = editList
+			if len(m.ownList(m.editSpec)) == 0 {
+				m.screen = browse
+			} else {
+				m.screen = editList
+			}
 		} else {
 			m.screen = browse
 		}
@@ -599,6 +607,9 @@ func (m *Model) handleListKey(msg tea.KeyPressMsg) {
 			}
 			m.status = m.tr("status.item_removed")
 		}
+	case "u":
+		m.unset(m.editSpec)
+		m.listSelected = 0
 	}
 }
 
@@ -1424,7 +1435,12 @@ func (m *Model) renderChoice() string {
 	options := m.choiceOptions()
 	var lines []string
 	contentWidth := m.modalContentWidth()
-	description := wrap(m.specDescription(m.editSpec.ID, m.editSpec.Description), contentWidth)
+	intro := m.text().Bold(true).Render(
+		wrap(m.specDescription(m.editSpec.ID, m.editSpec.Description), contentWidth),
+	)
+	if purpose := m.specPurpose(m.editSpec.ID, m.editSpec.Purpose); purpose != "" {
+		intro += "\n" + m.muted().Render(wrap(purpose, contentWidth))
+	}
 	inheritHelp := ""
 	if m.choiceIncludesInherit() {
 		inheritHelp = wrap(m.tr("choice.inherit_help", m.scopeLabel(string(m.scope))), contentWidth)
@@ -1432,7 +1448,7 @@ func (m *Model) renderChoice() string {
 	compact := m.height < 24
 	visible := max(3, m.height-6)
 	if !compact {
-		visible = max(3, m.height-lipgloss.Height(description)-lipgloss.Height(inheritHelp)-8)
+		visible = max(3, m.height-lipgloss.Height(intro)-lipgloss.Height(inheritHelp)-8)
 	}
 	start := 0
 	if m.choice >= visible {
@@ -1462,7 +1478,7 @@ func (m *Model) renderChoice() string {
 	}
 	parts := []string{strings.Join(lines, "\n")}
 	if !compact {
-		parts = append([]string{description}, parts...)
+		parts = append([]string{intro}, parts...)
 		if inheritHelp != "" {
 			parts = append(parts, m.muted().Render(inheritHelp))
 		}
@@ -1474,9 +1490,38 @@ func (m *Model) renderChoice() string {
 
 func (m *Model) renderList() string {
 	items := m.ownList(m.editSpec)
+	contentWidth := m.modalContentWidth()
+	_, stored := config.Get(m.drafts[m.scope], m.editSpec.Path)
 	var lines []string
 	if len(items) == 0 {
-		lines = append(lines, m.muted().Render(m.tr("list.empty")))
+		lines = append(lines, m.accent().Bold(true).Render(m.tr("list.empty.title")))
+		if stored {
+			lines = append(lines, m.muted().Render(
+				wrap(m.tr("list.empty.stored", m.scopeLabel(string(m.scope))), contentWidth),
+			))
+		} else {
+			lines = append(lines, m.muted().Render(
+				wrap(m.tr("list.empty.unset", m.scopeLabel(string(m.scope))), contentWidth),
+			))
+		}
+		hasEffective := false
+		if effective, source, ok := m.effective(m.editSpec); ok {
+			if inherited, ok := effective.([]any); ok && len(inherited) > 0 {
+				hasEffective = true
+				lines = append(lines, "", m.sectionTitle(m.tr("list.effective", m.sourceLabel(source))))
+				for _, item := range inherited {
+					lines = append(lines, m.text().Render("  • "+m.optionLabel(m.editSpec.ID, fmt.Sprint(item))))
+				}
+			}
+		}
+		if !hasEffective {
+			lines = append(lines, "", m.muted().Render(wrap(m.tr("list.default"), contentWidth)))
+		}
+		addLabel := m.tr("list.add_custom")
+		if len(m.editSpec.Options) > 0 {
+			addLabel = m.tr("list.add_options")
+		}
+		lines = append(lines, "", m.action("A", addLabel, true))
 	} else {
 		for i, item := range items {
 			style := m.muted()
@@ -1489,7 +1534,15 @@ func (m *Model) renderList() string {
 			lines = append(lines, style.Render(prefix+value))
 		}
 	}
-	body := wrap(m.specDescription(m.editSpec.ID, m.editSpec.Description), m.modalContentWidth()) + "\n\n" +
+	scopeTitle := m.tr("detail.this_scope") + " · " + fmt.Sprint(len(items))
+	if m.editSpec.MaxItems > 0 {
+		scopeTitle += "/" + fmt.Sprint(m.editSpec.MaxItems)
+	}
+	body := m.text().Bold(true).Render(wrap(
+		m.specDescription(m.editSpec.ID, m.editSpec.Description), contentWidth,
+	)) + "\n" +
+		m.muted().Render(wrap(m.specPurpose(m.editSpec.ID, m.editSpec.Purpose), contentWidth)) + "\n\n" +
+		m.sectionTitle(scopeTitle) + "\n" +
 		strings.Join(lines, "\n") + "\n\n" +
 		m.muted().Render(m.tr("list.help"))
 	if m.editSpec.MaxItems > 0 {

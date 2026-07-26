@@ -62,7 +62,8 @@ render_locale() {
   locale="$2"
   main_wait="$3"
   settings_wait="$4"
-  status_wait="$5"
+  fallback_wait="$5"
+  status_wait="$6"
   output_dir="docs/screenshots/${language}"
   demo_root="${temp_root}/demo-${language}"
   tui_tape="${temp_root}/tui-${language}.tape"
@@ -74,6 +75,7 @@ render_locale() {
     -e "s|__LOCALE__|${locale}|g" \
     -e "s|__MAIN_WAIT__|${main_wait}|g" \
     -e "s|__SETTINGS_WAIT__|${settings_wait}|g" \
+    -e "s|__FALLBACK_WAIT__|${fallback_wait}|g" \
     -e "s|__DEMO_ROOT__|${demo_root}|g" \
     -e "s|__OUTPUT_DIR__|${output_dir}|g" \
     -e "s|__OUTPUT_GIF__|${temp_root}/tui-${language}.gif|g" \
@@ -86,15 +88,15 @@ render_locale() {
     -e "s|__OUTPUT_GIF__|${temp_root}/status-${language}.gif|g" \
     docs/statusline.tape >"$status_tape"
 
-  rm -f "${output_dir}/tui-main.png" "${output_dir}/tui-models.png" "${output_dir}/statusline-limits.png"
-  record "$tui_tape" "${output_dir}/tui-main.png" "${output_dir}/tui-models.png"
+  rm -f "${output_dir}/tui-main.png" "${output_dir}/tui-models.png" "${output_dir}/tui-fallback.png" "${output_dir}/statusline-limits.png"
+  record "$tui_tape" "${output_dir}/tui-main.png" "${output_dir}/tui-models.png" "${output_dir}/tui-fallback.png"
   record "$status_tape" "${output_dir}/statusline-limits.png"
 }
 
-render_locale en "en_US.UTF-8" "MAIN MENU" "SETTINGS" "used"
-render_locale ru "ru_RU.UTF-8" "ГЛАВНОЕ МЕНЮ" "НАСТРОЙКИ" "исп."
-render_locale zh-CN "zh_CN.UTF-8" "主菜单" "设置" "已用"
-rm -f docs/tui-main.png docs/tui-models.png docs/statusline-limits.png docs/claude-cli-statusline.png
+render_locale en "en_US.UTF-8" "MAIN MENU" "SETTINGS" "Fallback models" "used"
+render_locale ru "ru_RU.UTF-8" "ГЛАВНОЕ МЕНЮ" "НАСТРОЙКИ" "Резервные модели" "исп."
+render_locale zh-CN "zh_CN.UTF-8" "主菜单" "设置" "后备模型" "已用"
+rm -f docs/tui-main.png docs/tui-models.png docs/tui-fallback.png docs/statusline-limits.png docs/claude-cli-statusline.png
 
 warm_pixels() {
   ffmpeg -v error -i "$1" -f rawvideo -pix_fmt rgb24 - |
@@ -118,6 +120,7 @@ for language in en ru zh-CN; do
   for screenshot in \
     "${output_dir}/tui-main.png" \
     "${output_dir}/tui-models.png" \
+    "${output_dir}/tui-fallback.png" \
     "${output_dir}/statusline-limits.png" \
     "${output_dir}/claude-cli-statusline.png"; do
     if [ ! -s "$screenshot" ]; then
@@ -127,6 +130,7 @@ for language in en ru zh-CN; do
   done
   for screenshot in \
     "${output_dir}/tui-main.png" \
+    "${output_dir}/tui-fallback.png" \
     "${output_dir}/statusline-limits.png" \
     "${output_dir}/claude-cli-statusline.png"; do
     if [ "$(warm_pixels "$screenshot")" -lt 500 ]; then

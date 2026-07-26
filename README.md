@@ -19,6 +19,8 @@ anywhere.
   normal model selection.
 - Current `fable`, `best`, `sonnet`, `opus`, and `haiku` aliases, plus an
   explicit **Default / inherit** action in every scoped picker.
+- Ready, localized templates for `permissions.allow`, `ask`, and `deny`, with
+  the exact Claude Code rule shown before it is selected.
 - Reasoning, agents, permissions, sandbox, interface, and behavior settings.
 - Typed controls for nested-agent depth, total/concurrent subagent caps, tool
   concurrency, interactive `/init`, and shared task lists.
@@ -131,6 +133,16 @@ ordinary model selection never opens a string field. See the
 [official model configuration](https://code.claude.com/docs/en/model-config).
 
 ![Fable 5 main model and Sonnet 5 subagents](docs/screenshots/en/tui-models.png)
+
+### Fallback and permission lists
+
+Opening an empty fallback or permission list now goes straight to useful
+choices instead of a blank editor. Fallbacks include the account default,
+Fable, Sonnet, Opus, Haiku, and custom provider IDs. Permission templates use
+Claude Code's `Tool` / `Tool(specifier)` syntax and always show the raw rule;
+**Custom value…** remains available for anything project-specific.
+
+![Fallback model picker](docs/screenshots/en/tui-fallback.png)
 
 ### Inheritance, reset, and save
 
