@@ -2,7 +2,7 @@ Output "__OUTPUT_GIF__"
 
 Set Shell "bash"
 Set Width 1400
-Set Height 220
+Set Height 260
 Set FontSize 18
 Set FontFamily "__NERD_FONT__"
 Set LineHeight 1.2
@@ -20,9 +20,11 @@ Env TZ "Asia/Irkutsk"
 Env TERM "xterm-256color"
 Env COLORTERM "truecolor"
 Env NO_COLOR ""
+Env CLAUDE_CONFIG_STATUSLINE_SUBAGENT_MODEL "claude-sonnet-5"
+Env CLAUDE_CONFIG_STATUSLINE_ADVISOR_MODEL "opus"
 
 Hide
-Type "clear; tput civis; COLUMNS=155 ./scripts/render-statusline-demo.sh; read -r"
+Type "clear; tput civis; COLUMNS=120 ./scripts/render-statusline-demo.sh; read -r"
 Enter
 Wait+Screen /__STATUS_WAIT__/
 Show

@@ -25,9 +25,11 @@ capture_locale() {
   full="${locale_root}/full.png"
   cropped="${locale_root}/cropped.png"
   vhs_log="${locale_root}/vhs.log"
-  mkdir -p "${demo_dir}/bin" "$output_dir"
+  mkdir -p "${demo_dir}/bin" "${demo_dir}/.claude" "$output_dir"
   git -C "$demo_dir" init -q -b main
-  cp "${repo_dir}/docs/demo-settings.json" "${demo_dir}/settings.json"
+  cp "${repo_dir}/docs/demo-settings.json" "${demo_dir}/.claude/settings.json"
+  sed '/"advisorModel": "opus",/d' \
+    "${repo_dir}/docs/demo-settings.json" >"${demo_dir}/settings.json"
   cp "${repo_dir}/bin/claude-config" "${demo_dir}/bin/claude-config"
 
   sed \
@@ -50,7 +52,7 @@ capture_locale() {
   fi
   test -s "$full"
   ffmpeg -y -v error -i "$full" \
-    -vf "crop=iw:265:0:ih-265,pad=iw:ih+32:0:0:color=0x1f1f1d" \
+    -vf "crop=iw:165:0:ih-236,pad=iw:ih+32:0:0:color=0x1c1e1b" \
     -frames:v 1 "$cropped"
   test -s "$cropped"
   mv "$cropped" "${output_dir}/claude-cli-statusline.png"

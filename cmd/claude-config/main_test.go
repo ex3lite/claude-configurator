@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -51,7 +52,12 @@ func TestVersionAndValidation(t *testing.T) {
 
 func TestStatuslineSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	input := strings.NewReader(`{"model":{"display_name":"Fable 5"},"context_window":{"remaining_percentage":97}}`)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("LC_ALL", "en_US.UTF-8")
+	input := strings.NewReader(fmt.Sprintf(
+		`{"cwd":%q,"model":{"display_name":"Fable 5"},"context_window":{"remaining_percentage":97}}`,
+		t.TempDir(),
+	))
 	if code := runStatusline([]string{"--theme", "mono"}, input, &stdout, &stderr); code != 0 {
 		t.Fatalf("statusline exit = %d, stderr = %s", code, stderr.String())
 	}

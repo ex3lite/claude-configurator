@@ -3,8 +3,10 @@
 ## v0.5.0 — 2026-07-26
 
 - Added dedicated 5-hour and 7-day limit rows with progress bars, used and
-  remaining percentages, exact reset dates in the system timezone, and
-  localized countdowns.
+  remaining percentages, reset dates converted to the device's local time
+  without a redundant timezone suffix, and localized countdowns.
+- Added a dedicated model-role row for the live primary model plus effective
+  subagent and advisor models inherited from global, project, and local scopes.
 - Added explicit waiting text when Claude has not supplied `rate_limits`;
   missing windows never receive invented values or dates.
 - Added automatic Nerd Font detection and a Claude icon status-line theme.

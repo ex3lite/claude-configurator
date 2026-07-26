@@ -22,8 +22,8 @@ anywhere.
 - Reasoning, agents, permissions, sandbox, interface, and behavior settings.
 - Typed controls for nested-agent depth, total/concurrent subagent caps, tool
   concurrency, interactive `/init`, and shared task lists.
-- Claude-style status bar themes with live context, 5-hour/7-day allowance,
-  exact local reset time, timezone, and countdowns.
+- Claude-style status bar themes with primary/subagent/advisor model roles,
+  live context, 5-hour/7-day allowance, local reset time, and countdowns.
 - Automatic Nerd Font detection with an optional icon theme.
 - Auto-localized TUI in English, Russian, or Simplified Chinese.
 - Claude Code-inspired warm palette, clear title/subtitle hierarchy, and
@@ -188,11 +188,15 @@ The bar uses Claude Code's
 [official status-line JSON](https://code.claude.com/docs/en/statusline) rather
 than scraping terminal text. Each available 5-hour or 7-day window shows a
 progress bar, used and remaining percentages, an exact reset date/time in the
-system timezone, and a readable countdown. For example:
-`today, 17:00 (UTC+8) · in 3h 23m`. Wider terminals combine both windows;
-narrower terminals place them on separate rows. The first row also contains
-the model, project, Git branch, remaining context, and local time. Session,
-agent, effort, thinking, fast, Vim, and output-style state follow when present.
+device's local timezone, and a readable countdown. For example:
+`today, 17:00 · in 3h 23m`. The redundant timezone suffix is omitted because
+the time is already converted for the user. Wider terminals combine both
+windows; narrower terminals place them on separate rows. A dedicated first row
+shows the primary model reported by the active session plus the effective
+subagent and advisor models inherited from global, project, and local settings.
+The next row contains project, Git branch, remaining context, and local time.
+Session, agent, effort, thinking, fast, Vim, and output-style state follow when
+present.
 
 Themes are **Auto**, **Claude Icons** for Nerd Font v3, Claude clay true color,
 terminal ANSI, and monochrome. The icon option appears only when Claude

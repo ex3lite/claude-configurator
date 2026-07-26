@@ -1,6 +1,8 @@
 package statusline
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ func TestRenderLimitsAndResponsiveLayout(t *testing.T) {
 	contextLeft, thinking := 97.0, true
 	var data Data
 	data.Model.DisplayName = "Fable 5"
+	data.ConfiguredModels = ModelRoles{Subagent: "claude-sonnet-5", Advisor: "opus"}
 	data.Workspace.Repo.Name = "demo-project"
 	data.ContextWindow.RemainingPercentage = &contextLeft
 	data.RateLimits.FiveHour = &RateWindow{UsedPercentage: 36, ResetsAt: now.Add(time.Hour + 42*time.Minute).Unix()}
@@ -25,11 +28,12 @@ func TestRenderLimitsAndResponsiveLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, expected := range []string{
-		"Fable 5", "demo-project", "git:main", "ctx:97% left",
+		"Main: Fable 5", "Subagents: Sonnet 5", "Advisor: Opus",
+		"demo-project", "git:main", "ctx:97% left",
 		"5h", "▓▓▓▓░░░░░░", "36% used · 64% left",
-		"resets today, 11:42 (UTC) · in 1h 42m",
+		"resets today, 11:42 · in 1h 42m",
 		"7d", "▓▓░░░░░░░░", "16% used · 84% left",
-		"resets Jul 29, 14:00 (UTC) · in 3d 4h",
+		"resets Jul 29, 14:00 · in 3d 4h",
 		"effort:xhigh", "thinking:on",
 	} {
 		if !strings.Contains(rendered, expected) {
@@ -76,12 +80,53 @@ func TestRenderLimitsAndResponsiveLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, expected := range []string{
-		"󰚩 Fable 5", " main", " 5h",
+		"󰚩 Основная: Fable 5", "Сабагенты: Sonnet 5", "Advisor: Opus",
+		" main", " 5h",
 		"36% исп. · 64% ост.",
-		"сброс сегодня, 11:42 (UTC+8) · через 1 ч 42 мин",
+		"сброс сегодня, 11:42 · через 1 ч 42 мин",
 	} {
 		if !strings.Contains(localized, expected) {
 			t.Fatalf("localized status line missing %q: %q", expected, localized)
 		}
+	}
+}
+
+func TestConfiguredModelsFollowScopePrecedence(t *testing.T) {
+	home := t.TempDir()
+	project := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_STATUSLINE_SUBAGENT_MODEL", "")
+	t.Setenv("CLAUDE_CONFIG_STATUSLINE_ADVISOR_MODEL", "")
+	t.Setenv("CLAUDE_CODE_SUBAGENT_MODEL", "")
+
+	writeSettings := func(path, body string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeSettings(filepath.Join(home, ".claude", "settings.json"),
+		`{"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"haiku"},"advisorModel":"sonnet"}`)
+	writeSettings(filepath.Join(project, ".claude", "settings.json"),
+		`{"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"claude-sonnet-5"},"advisorModel":"opus"}`)
+
+	roles := configuredModels(home, project)
+	if roles.Subagent != "claude-sonnet-5" || roles.Advisor != "opus" {
+		t.Fatalf("configured models = %#v", roles)
+	}
+}
+
+func TestModelRolesShowClaudeDefault(t *testing.T) {
+	var data Data
+	data.Model.DisplayName = "Fable 5"
+	rendered, err := Render(data, Options{Theme: "mono", Columns: 100, Language: "ru"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(rendered, "Сабагенты: По умолчанию Claude") ||
+		!strings.Contains(rendered, "Advisor: По умолчанию Claude") {
+		t.Fatalf("default model roles are not explicit: %q", rendered)
 	}
 }

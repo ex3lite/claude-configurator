@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/ex3lite/claude-configurator/internal/config"
 )
 
 type Data struct {
@@ -58,6 +60,12 @@ type Data struct {
 	Worktree struct {
 		Branch string `json:"branch"`
 	} `json:"worktree"`
+	ConfiguredModels ModelRoles `json:"-"`
+}
+
+type ModelRoles struct {
+	Subagent string
+	Advisor  string
 }
 
 type RateWindow struct {
@@ -97,6 +105,7 @@ func Run(in io.Reader, out io.Writer, theme string, now time.Time) error {
 	if branch == "" {
 		branch = gitBranch(cwd)
 	}
+	data.ConfiguredModels = configuredModels("", cwd)
 	rendered, err := Render(data, Options{
 		Theme:     theme,
 		Columns:   columns,
@@ -129,18 +138,14 @@ func Render(data Data, options Options) (string, error) {
 	}
 	icons := options.Theme == "nerd"
 
-	model := data.Model.DisplayName
-	if model == "" {
-		model = data.Model.ID
+	models, plain := fit(modelSegments(data, options.Language, icons), options.Columns)
+	modelLine := paintSegments(colors, models)
+	if plain != "" {
+		modelLine = plain
 	}
-	if model == "" {
-		model = "Claude"
-	}
-	if icons {
-		model = "󰚩 " + model
-	}
-	segments := []segment{{text: shorten(model, 28), compact: shorten(model, 14), role: "accent"}}
+	lines := []string{modelLine}
 
+	var segments []segment
 	if project := projectName(data); project != "" {
 		if icons {
 			project = " " + project
@@ -163,8 +168,9 @@ func Render(data Data, options Options) (string, error) {
 		if icons {
 			prefix = "󰍛 "
 		}
+		left := wordsFor(options.Language).left
 		segments = append(segments, segment{
-			text:     fmt.Sprintf("%s%d%% left", prefix, percent(remaining)),
+			text:     fmt.Sprintf("%s%d%% %s", prefix, percent(remaining), left),
 			compact:  fmt.Sprintf("%s%d%%", prefix, percent(remaining)),
 			role:     usageRole(remaining),
 			priority: 1,
@@ -176,17 +182,126 @@ func Render(data Data, options Options) (string, error) {
 	}
 	segments = append(segments, segment{text: clock, role: "muted", priority: 5})
 
-	segments, plain := fit(segments, options.Columns)
-	first := paintSegments(colors, segments)
+	segments, plain = fit(segments, options.Columns)
+	workspaceLine := paintSegments(colors, segments)
 	if plain != "" {
-		first = plain
+		workspaceLine = plain
 	}
-	lines := []string{first}
+	lines = append(lines, workspaceLine)
 	lines = append(lines, limitLines(data, colors, options)...)
 	if second := secondaryLine(data, colors, options.Columns); second != "" {
 		lines = append(lines, second)
 	}
 	return strings.Join(lines, "\n"), nil
+}
+
+func configuredModels(home, cwd string) ModelRoles {
+	roles := ModelRoles{
+		Subagent: strings.TrimSpace(os.Getenv("CLAUDE_CONFIG_STATUSLINE_SUBAGENT_MODEL")),
+		Advisor:  strings.TrimSpace(os.Getenv("CLAUDE_CONFIG_STATUSLINE_ADVISOR_MODEL")),
+	}
+	if roles.Subagent == "" {
+		roles.Subagent = strings.TrimSpace(os.Getenv("CLAUDE_CODE_SUBAGENT_MODEL"))
+	}
+	workspace, err := config.LoadWorkspace(home, cwd)
+	if err != nil {
+		return roles
+	}
+	if roles.Subagent == "" {
+		roles.Subagent = effectiveString(workspace, "env.CLAUDE_CODE_SUBAGENT_MODEL")
+	}
+	if roles.Advisor == "" {
+		roles.Advisor = effectiveString(workspace, "advisorModel")
+	}
+	return roles
+}
+
+func effectiveString(workspace *config.Workspace, path string) string {
+	value, _, ok := workspace.Effective(config.Local, path, false)
+	if !ok {
+		return ""
+	}
+	text, _ := value.(string)
+	return strings.TrimSpace(text)
+}
+
+type modelWords struct {
+	main, subagent, advisor                      string
+	mainCompact, subagentCompact, advisorCompact string
+	defaultValue, defaultCompact                 string
+}
+
+func modelLabels(language string) modelWords {
+	switch language {
+	case "ru":
+		return modelWords{"Основная", "Сабагенты", "Advisor", "О", "С", "A", "По умолчанию Claude", "по умолч."}
+	case "zh-CN":
+		return modelWords{"主模型", "子代理", "Advisor", "主", "子", "A", "Claude 默认", "默认"}
+	default:
+		return modelWords{"Main", "Subagents", "Advisor", "M", "S", "A", "Claude default", "default"}
+	}
+}
+
+func modelSegments(data Data, language string, icons bool) []segment {
+	labels := modelLabels(language)
+	main := data.Model.DisplayName
+	if main == "" {
+		main = data.Model.ID
+	}
+	prefix := ""
+	if icons {
+		prefix = "󰚩 "
+	}
+	return []segment{
+		modelSegment(prefix+labels.main, labels.mainCompact, main, labels, "accent"),
+		modelSegment(labels.subagent, labels.subagentCompact, data.ConfiguredModels.Subagent, labels, "git"),
+		modelSegment(labels.advisor, labels.advisorCompact, data.ConfiguredModels.Advisor, labels, "context"),
+	}
+}
+
+func modelSegment(label, compactLabel, value string, labels modelWords, role string) segment {
+	if value == "" {
+		return segment{
+			text:    label + ": " + labels.defaultValue,
+			compact: compactLabel + ":" + labels.defaultCompact,
+			role:    role,
+		}
+	}
+	value = modelDisplay(value)
+	return segment{
+		text:    label + ": " + shorten(value, 24),
+		compact: compactLabel + ":" + shorten(value, 12),
+		role:    role,
+	}
+}
+
+func modelDisplay(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "claude-fable-5[1m]":
+		return "Fable 5 · 1M"
+	case "claude-fable-5":
+		return "Fable 5"
+	case "claude-sonnet-5":
+		return "Sonnet 5"
+	case "fable[1m]":
+		return "Fable · 1M"
+	case "sonnet[1m]":
+		return "Sonnet · 1M"
+	case "opus[1m]":
+		return "Opus · 1M"
+	case "fable":
+		return "Fable"
+	case "sonnet":
+		return "Sonnet"
+	case "opus":
+		return "Opus"
+	case "haiku":
+		return "Haiku"
+	case "best":
+		return "Best available"
+	default:
+		return strings.TrimSpace(value)
+	}
 }
 
 func projectName(data Data) string {
@@ -516,12 +631,11 @@ func formatReset(reset, now time.Time, language string) string {
 	default:
 		datePart = calendarDate(reset, now, language) + ", " + timePart
 	}
-	return datePart + " (" + timezoneLabel(reset) + ")"
+	return datePart
 }
 
 func formatResetCompact(reset, now time.Time, language string) string {
-	full := formatReset(reset, now, language)
-	return strings.NewReplacer(", ", " ", " (", " ").Replace(full[:len(full)-1])
+	return strings.ReplaceAll(formatReset(reset, now, language), ", ", " ")
 }
 
 func calendarDate(value, now time.Time, language string) string {
@@ -547,23 +661,6 @@ func calendarDate(value, now time.Time, language string) string {
 func sameDate(left, right time.Time) bool {
 	left = left.In(right.Location())
 	return left.Year() == right.Year() && left.YearDay() == right.YearDay()
-}
-
-func timezoneLabel(value time.Time) string {
-	_, offset := value.Zone()
-	if offset == 0 {
-		return "UTC"
-	}
-	sign := "+"
-	if offset < 0 {
-		sign = "-"
-		offset = -offset
-	}
-	hours, minutes := offset/3600, offset%3600/60
-	if minutes == 0 {
-		return fmt.Sprintf("UTC%s%d", sign, hours)
-	}
-	return fmt.Sprintf("UTC%s%d:%02d", sign, hours, minutes)
 }
 
 func systemLanguage() string {
