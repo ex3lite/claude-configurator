@@ -147,4 +147,5 @@ for language in en ru zh-CN; do
     fi
   done
 done
+"${repo_dir}/scripts/render-social-preview.sh"
 echo "Updated localized English, Russian, and Simplified Chinese screenshots using ${screenshot_font}."

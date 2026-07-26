@@ -105,20 +105,42 @@ try {
     if ($actual -ne $expected) { throw "Checksum verification failed" }
 
     Expand-Archive "$tempDir\$archive" -DestinationPath "$tempDir\unpacked"
+    $unpackedBinary = "$tempDir\unpacked\claude-config.exe"
+    $unpackedVersion = (& $unpackedBinary --version).Trim()
+    if ($unpackedVersion -ne $releaseVersion) {
+        throw "Downloaded binary reports $unpackedVersion; expected $releaseVersion"
+    }
+
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Copy-Item "$tempDir\unpacked\claude-config.exe" "$InstallDir\claude-config.exe" -Force
+    Copy-Item $unpackedBinary "$InstallDir\claude-config.exe" -Force
     '@echo off
 "%~dp0claude-config.exe" %*' | Set-Content "$InstallDir\claude-configurator.cmd" -Encoding Ascii
     '@echo off
 "%~dp0claude-config.exe" %*' | Set-Content "$InstallDir\ccfg.cmd" -Encoding Ascii
 
-    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    if (($userPath -split ";") -notcontains $InstallDir) {
-        [Environment]::SetEnvironmentVariable("Path", "$userPath;$InstallDir", "User")
+    $installedBinary = "$InstallDir\claude-config.exe"
+    $installedVersion = (& $installedBinary --version).Trim()
+    if ($installedVersion -ne $releaseVersion) {
+        throw "Installed binary verification failed: expected $releaseVersion, got $installedVersion"
     }
-    Write-Host "Installed claude-config $releaseTag to $InstallDir"
+
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $currentPathContainsInstallDir = ($env:Path -split ";") -contains $InstallDir
+    $userPathContainsInstallDir = ($userPath -split ";") -contains $InstallDir
+    Write-Host "Installed and verified claude-config $releaseTag in $InstallDir"
     Offer-NerdFont $tempDir
-    Write-Host "Open a new terminal, then run claude-config."
+    if (-not $currentPathContainsInstallDir) {
+        if ($userPathContainsInstallDir) {
+            Write-Host "Open a new terminal, then run claude-config."
+        } else {
+            $escapedInstallDir = $InstallDir.Replace("'", "''")
+            Write-Host ""
+            Write-Host "The install directory is not on PATH in this PowerShell session."
+            Write-Host "Run this exact command now:"
+            Write-Host "  `$env:Path = '$escapedInstallDir;' + `$env:Path"
+            Write-Host "Use Windows Environment Variables if you want that PATH entry to persist."
+        }
+    }
 } finally {
     Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
 }

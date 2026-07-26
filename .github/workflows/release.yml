@@ -3,13 +3,48 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v*.*.*"
 
 permissions:
   contents: write
 
 jobs:
+  validate:
+    name: Validate on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Validate tag and release notes
+        shell: bash
+        run: ./scripts/release-notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release-notes.md"
+      - run: go test -race ./...
+      - run: go vet ./...
+      - name: Build and smoke-test the native CLI
+        shell: bash
+        run: |
+          suffix=""
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            suffix=".exe"
+          fi
+          binary="$RUNNER_TEMP/claude-config${suffix}"
+          version="${GITHUB_REF_NAME#v}"
+          go build -ldflags "-s -w -X main.version=${version}" -o "$binary" ./cmd/claude-config
+          test "$("$binary" --version)" = "$version"
+          "$binary" --help > "$RUNNER_TEMP/help.txt" 2>&1
+          grep -q "claude-config" "$RUNNER_TEMP/help.txt"
+
   release:
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -19,10 +54,59 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Build release notes from CHANGELOG.md
+        run: ./scripts/release-notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release-notes.md"
       - uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: v2.17.0
-          args: release --clean
+          args: release --clean --release-notes ${{ runner.temp }}/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+          if-no-files-found: error
+
+  smoke:
+    name: Smoke release archive on ${{ matrix.os }}
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: release-assets
+          path: release-assets
+      - name: Verify checksum and run the packaged binary
+        shell: pwsh
+        run: ./scripts/smoke-release.ps1
+
+  publish:
+    name: Publish verified draft
+    needs: smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            gh release edit "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft=false \
+              --prerelease
+          else
+            gh release edit "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft=false \
+              --prerelease=false \
+              --latest
+          fi

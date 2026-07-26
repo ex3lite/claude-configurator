@@ -27,18 +27,25 @@ jobs:
       - run: go vet ./...
       - run: go build ./cmd/claude-config
       - if: runner.os != 'Windows'
-        run: sh -n scripts/install.sh scripts/update-screenshots.sh scripts/update-live-screenshot.sh scripts/render-statusline-demo.sh
+        run: sh -n scripts/install.sh scripts/release-notes.sh scripts/render-social-preview.sh scripts/update-screenshots.sh scripts/update-live-screenshot.sh scripts/render-statusline-demo.sh
+      - if: runner.os == 'Linux'
+        run: |
+          latest_tag="$(awk '/^## v/{print $2; exit}' CHANGELOG.md)"
+          ./scripts/release-notes.sh "$latest_tag" > "$RUNNER_TEMP/release-notes.md"
+          grep -q "^## Verification$" "$RUNNER_TEMP/release-notes.md"
       - if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path scripts/install.ps1),
-            [ref]$tokens,
-            [ref]$errors
-          ) | Out-Null
-          if ($errors.Count) {
-            $errors | Format-List
-            exit 1
+          foreach ($script in @("scripts/install.ps1", "scripts/smoke-release.ps1")) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $script),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count) {
+              $errors | Format-List
+              exit 1
+            }
           }

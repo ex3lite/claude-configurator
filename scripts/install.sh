@@ -140,14 +140,33 @@ if [ "$actual" != "$expected" ]; then
 fi
 
 tar -xzf "${temp_dir}/${archive}" -C "$temp_dir"
+unpacked_version="$("${temp_dir}/claude-config" --version)"
+if [ "$unpacked_version" != "$release_version" ]; then
+  echo "Downloaded binary reports ${unpacked_version}; expected ${release_version}" >&2
+  exit 1
+fi
+
 mkdir -p "$install_dir"
 install -m 0755 "${temp_dir}/claude-config" "${install_dir}/claude-config"
 ln -sf claude-config "${install_dir}/claude-configurator"
 ln -sf claude-config "${install_dir}/ccfg"
 
-echo "Installed claude-config ${release_tag} to ${install_dir}"
+installed_version="$("${install_dir}/claude-config" --version)"
+if [ "$installed_version" != "$release_version" ]; then
+  echo "Installed binary verification failed: expected ${release_version}, got ${installed_version}" >&2
+  exit 1
+fi
+
+echo "Installed and verified claude-config ${release_tag} in ${install_dir}"
 offer_nerd_font
 case ":${PATH}:" in
   *":${install_dir}:"*) ;;
-  *) echo "Add ${install_dir} to PATH to run claude-config." ;;
+  *)
+    quoted_install_dir="$(printf '%s' "$install_dir" | sed "s/'/'\\\\''/g")"
+    echo
+    echo "The install directory is not on PATH in this shell."
+    echo "Run this exact command now:"
+    printf "  export PATH='%s':\"\$PATH\"\n" "$quoted_install_dir"
+    echo "Add the same line to your shell profile if you want it to persist."
+    ;;
 esac

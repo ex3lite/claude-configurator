@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.7.0 — 2026-07-26
+
+- Made releases fail closed: semantic tag validation, tests, vet, and native
+  CLI smoke builds now run on macOS, Linux, and Windows before packaging.
+- Kept new GitHub Releases as drafts until every packaged native archive passes
+  checksum, `--version`, and `--help` verification.
+- Replaced commit-SHA release bodies with structured notes generated from the
+  matching changelog section, including install, upgrade, screenshot, and
+  verification sections.
+- Made both installers verify the extracted and installed executable and print
+  an exact current-shell `PATH` command instead of silently changing profiles.
+- Added uninstall instructions and reorganized all three localized READMEs
+  around installation, the three core jobs, quick start, and a manual-JSON
+  comparison.
+- Added a reproducible 1280×640 social preview rendered from the real English
+  TUI screenshot rather than generated artwork.
+- Improved the public repository description, discoverability topics,
+  Discussions availability, Wiki policy, and area/platform labels.
+
 ## v0.6.0 — 2026-07-26
 
 - Replaced blank fallback and permission list entry screens with immediate,

@@ -11,30 +11,6 @@
 
 ![Claude Configurator 界面](docs/screenshots/zh-CN/tui-main.png)
 
-## 功能
-
-- 支持全局、项目共享和项目本地三个作用域。
-- 使用选择器配置主模型、子代理模型、Advisor 模型和回退模型链；
-  常规模型无需手动输入。
-- 包含当前 `fable`、`best`、`sonnet`、`opus` 和 `haiku` 别名，并在
-  每个分层选择器中提供明确的**默认 / 继承**选项。
-- 为 `permissions.allow`、`ask` 和 `deny` 提供本地化预设，并在选择前
-  显示准确的 Claude Code 规则。
-- 配置推理、代理、权限、沙箱、界面和行为。
-- 使用类型化控件设置嵌套代理深度、子代理总数/并发数、工具并发、
-  交互式 `/init` 和共享任务列表。
-- Claude 风格状态栏分别显示主模型、子代理模型和 advisor，并显示剩余上下文、
-  真实 5 小时/7 天限额、本地重置时间和倒计时。
-- 自动检测 Nerd Font，并按检测结果解锁图标主题。
-- TUI 可按系统语言自动切换英语、俄语或简体中文。
-- 使用 Claude Code 风格的暖色配色、清晰的标题层级，以及“控制什么 /
-  为什么需要”的易懂说明。
-- 固定操作栏会一直显示保存、快捷键、继承来源、暂存修改和保存前 diff。
-- 检测写入冲突、自动备份，并拒绝覆盖无效 JSON。
-- 仅在用户确认后，从已验证的 GitHub Release 进行自更新。
-- 正确识别 Git 仓库和 worktree。
-- 为 macOS、Linux 和 Windows 提供单一原生二进制文件。
-
 ## 安装
 
 ### macOS 或 Linux
@@ -78,7 +54,46 @@ go install github.com/ex3lite/claude-configurator/cmd/claude-config@latest
 也可以从[发布页面](https://github.com/ex3lite/claude-configurator/releases)
 下载预编译压缩包和 checksums。
 
-## 使用
+两个安装脚本都会验证下载的压缩包和最终安装的二进制文件。如果目标目录不在
+`PATH` 中，脚本会显示适用于当前 shell 的准确命令，不会静默修改 shell
+配置文件。
+
+### 卸载
+
+macOS/Linux 默认安装：
+
+```sh
+rm -f "$HOME/.local/bin/claude-config" \
+  "$HOME/.local/bin/claude-configurator" \
+  "$HOME/.local/bin/ccfg"
+```
+
+Windows 默认安装：
+
+```powershell
+Remove-Item "$env:LOCALAPPDATA\Programs\claude-configurator" -Recurse -Force
+```
+
+这些命令只删除应用程序；Claude Code 设置、Configurator 备份和可选安装的
+Nerd Font 都会保留。
+
+## 三项核心能力
+
+- **无需提示词即可路由模型：**从类型化列表中选择主模型、子代理模型、
+  Advisor 模型和回退模型。
+- **安全控制优先级：**编辑 global、项目共享或项目本地设置，同时查看最终值
+  及其来源。
+- **查看当前会话：**安装 Claude 风格状态栏，显示模型角色、剩余上下文、
+  限额窗口、本地重置时间和倒计时。
+
+| 任务 | 手动编辑 JSON | Claude Configurator |
+|---|---|---|
+| 选择模型 | 记住键名和模型 ID | 本地化类型选择器 |
+| 处理作用域 | 手动比较三个文件 | 显示最终值和来源 |
+| 取消覆盖 | 精确且安全地删除键 | **重置并继承** |
+| 安全保存 | 默认没有冲突检查或备份 | Diff、冲突检查、原子写入和备份 |
+
+## 快速开始
 
 ```text
 claude-config
@@ -89,6 +104,30 @@ claude-config statusline --theme auto|nerd|claude|ansi|mono
 claude-config --help
 claude-config --version
 ```
+
+## 功能
+
+- 支持全局、项目共享和项目本地三个作用域。
+- 使用选择器配置主模型、子代理模型、Advisor 模型和回退模型链；
+  常规模型无需手动输入。
+- 包含当前 `fable`、`best`、`sonnet`、`opus` 和 `haiku` 别名，并在
+  每个分层选择器中提供明确的**默认 / 继承**选项。
+- 为 `permissions.allow`、`ask` 和 `deny` 提供本地化预设，并在选择前
+  显示准确的 Claude Code 规则。
+- 配置推理、代理、权限、沙箱、界面和行为。
+- 使用类型化控件设置嵌套代理深度、子代理总数/并发数、工具并发、
+  交互式 `/init` 和共享任务列表。
+- Claude 风格状态栏分别显示主模型、子代理模型和 advisor，并显示剩余上下文、
+  真实 5 小时/7 天限额、本地重置时间和倒计时。
+- 自动检测 Nerd Font，并按检测结果解锁图标主题。
+- TUI 可按系统语言自动切换英语、俄语或简体中文。
+- 固定操作栏会一直显示保存、快捷键、继承来源、暂存修改和保存前 diff。
+- 检测写入冲突、自动备份，并拒绝覆盖无效 JSON。
+- 仅在用户确认后，从已验证的 GitHub Release 进行自更新。
+- 正确识别 Git 仓库和 worktree。
+- 为 macOS、Linux 和 Windows 提供单一原生二进制文件。
+
+## 配置指南
 
 ### 作用域
 

@@ -12,31 +12,6 @@ anywhere.
 
 ![Claude Configurator TUI](docs/screenshots/en/tui-main.png)
 
-## Features
-
-- Global, shared project, and local project scopes.
-- Pickers for main, subagent, advisor, and fallback models; no raw typing for
-  normal model selection.
-- Current `fable`, `best`, `sonnet`, `opus`, and `haiku` aliases, plus an
-  explicit **Default / inherit** action in every scoped picker.
-- Ready, localized templates for `permissions.allow`, `ask`, and `deny`, with
-  the exact Claude Code rule shown before it is selected.
-- Reasoning, agents, permissions, sandbox, interface, and behavior settings.
-- Typed controls for nested-agent depth, total/concurrent subagent caps, tool
-  concurrency, interactive `/init`, and shared task lists.
-- Claude-style status bar themes with primary/subagent/advisor model roles,
-  live context, 5-hour/7-day allowance, local reset time, and countdowns.
-- Automatic Nerd Font detection with an optional icon theme.
-- Auto-localized TUI in English, Russian, or Simplified Chinese.
-- Claude Code-inspired warm palette, clear title/subtitle hierarchy, and
-  plain-language “what it controls / why you may need it” explanations.
-- Persistent action bar with Save, hotkeys, inherited-value/source display,
-  staged changes, and diff before save.
-- Conflict detection, automatic backups, and protection against invalid JSON.
-- Consent-based self-updates from verified GitHub Release assets.
-- Git repository and worktree-aware paths.
-- One native binary for macOS, Linux, and Windows.
-
 ## Install
 
 ### macOS or Linux
@@ -82,7 +57,46 @@ go install github.com/ex3lite/claude-configurator/cmd/claude-config@latest
 Prebuilt archives and checksums are also available on the
 [Releases page](https://github.com/ex3lite/claude-configurator/releases).
 
-## Use
+Both installers verify the downloaded archive and the installed binary. If the
+target directory is not already on `PATH`, they print the exact command for the
+current shell instead of silently changing a shell profile.
+
+### Uninstall
+
+Default macOS/Linux installation:
+
+```sh
+rm -f "$HOME/.local/bin/claude-config" \
+  "$HOME/.local/bin/claude-configurator" \
+  "$HOME/.local/bin/ccfg"
+```
+
+Default Windows installation:
+
+```powershell
+Remove-Item "$env:LOCALAPPDATA\Programs\claude-configurator" -Recurse -Force
+```
+
+This removes the application only. Claude Code settings, Configurator backups,
+and an optional Nerd Font remain untouched.
+
+## Three core abilities
+
+- **Route models without prompts:** choose the primary, subagent, advisor, and
+  fallback models from typed pickers.
+- **Control precedence safely:** edit global, shared project, or local project
+  settings while seeing the inherited value and source.
+- **See the active session:** install a Claude-style status line with model
+  roles, context remaining, allowance windows, local reset time, and countdowns.
+
+| Task | Manual JSON editing | Claude Configurator |
+|---|---|---|
+| Choose models | Remember keys and model IDs | Localized typed pickers |
+| Handle scopes | Manually reason about three files | Effective value and source shown |
+| Undo an override | Delete the exact key safely | **Reset to inherit** |
+| Save safely | No conflict or backup guard by default | Diff, conflict check, atomic write, backup |
+
+## Quick start
 
 ```text
 claude-config
@@ -93,6 +107,31 @@ claude-config statusline --theme auto|nerd|claude|ansi|mono
 claude-config --help
 claude-config --version
 ```
+
+## Features
+
+- Global, shared project, and local project scopes.
+- Pickers for main, subagent, advisor, and fallback models; no raw typing for
+  normal model selection.
+- Current `fable`, `best`, `sonnet`, `opus`, and `haiku` aliases, plus an
+  explicit **Default / inherit** action in every scoped picker.
+- Ready, localized templates for `permissions.allow`, `ask`, and `deny`, with
+  the exact Claude Code rule shown before it is selected.
+- Reasoning, agents, permissions, sandbox, interface, and behavior settings.
+- Typed controls for nested-agent depth, total/concurrent subagent caps, tool
+  concurrency, interactive `/init`, and shared task lists.
+- Claude-style status bar themes with primary/subagent/advisor model roles,
+  live context, 5-hour/7-day allowance, local reset time, and countdowns.
+- Automatic Nerd Font detection with an optional icon theme.
+- Auto-localized TUI in English, Russian, or Simplified Chinese.
+- Persistent action bar with Save, hotkeys, inherited-value/source display,
+  staged changes, and diff before save.
+- Conflict detection, automatic backups, and protection against invalid JSON.
+- Consent-based self-updates from verified GitHub Release assets.
+- Git repository and worktree-aware paths.
+- One native binary for macOS, Linux, and Windows.
+
+## Configuration guide
 
 ### Scopes
 
