@@ -514,8 +514,10 @@ func TestCategoryMenuScrollsToSelection(t *testing.T) {
 }
 
 func TestDisplayPathCollapsesHome(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(home, ".claude", "settings.json")
 	if got := displayPath(path); got != filepath.Join("~", ".claude", "settings.json") {
 		t.Fatalf("displayPath() = %q", got)
