@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/screenshots/**/*.png"
   pull_request:
 
 permissions:
