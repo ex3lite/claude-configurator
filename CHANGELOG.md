@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.1 — 2026-07-26
+
+- Kept the Unix self-update restart in the foreground terminal process so
+  Bubble Tea can reliably restore raw mode after replacing the binary.
+- Added a one-time compatibility fallback for updates started by v0.7.0:
+  installation completes without a raw-mode error and asks the user to run
+  `ccfg` again.
+
 ## v0.7.0 — 2026-07-26
 
 - Made releases fail closed: semantic tag validation, tests, vet, and native

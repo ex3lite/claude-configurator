@@ -27,6 +27,15 @@ func main() {
 		}
 		os.Exit(0)
 	}
+	if from, needed := selfupdate.NeedsManualRestart(); needed {
+		fmt.Fprintf(
+			os.Stdout,
+			"Claude Configurator updated from %s to %s. Run ccfg again.\n",
+			from,
+			version,
+		)
+		os.Exit(0)
+	}
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 

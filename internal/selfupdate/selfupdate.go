@@ -25,6 +25,8 @@ const (
 	latestReleaseURL = "https://api.github.com/repos/ex3lite/claude-configurator/releases/latest"
 	helperCommand    = "__claude_config_apply_update"
 	helperCleanupEnv = "CLAUDE_CONFIG_UPDATE_HELPER"
+	updatedFromEnv   = "CLAUDE_CONFIG_UPDATED_FROM"
+	restartModeEnv   = "CLAUDE_CONFIG_UPDATE_RESTART"
 	maxMetadataSize  = 2 << 20
 	maxChecksumSize  = 1 << 20
 	maxArchiveSize   = 128 << 20
@@ -233,20 +235,12 @@ func Launch(prepared Prepared, currentVersion string, originalArgs []string) err
 	if prepared.Binary == "" || prepared.Helper == "" || prepared.Target == "" {
 		return errors.New("update is not prepared")
 	}
-	arguments := []string{
-		helperCommand,
-		prepared.Binary,
-		prepared.Target,
-		strconv.Itoa(os.Getpid()),
-		currentVersion,
-		"--",
-	}
-	arguments = append(arguments, originalArgs...)
-	command := exec.Command(prepared.Helper, arguments...)
-	command.Stdin = os.Stdin
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	return command.Start()
+	return launchPrepared(prepared, currentVersion, originalArgs)
+}
+
+func NeedsManualRestart() (string, bool) {
+	from := os.Getenv(updatedFromEnv)
+	return from, runtime.GOOS != "windows" && from != "" && os.Getenv(restartModeEnv) == ""
 }
 
 func HandleHelper(args []string) (bool, error) {
@@ -275,9 +269,10 @@ func HandleHelper(args []string) (bool, error) {
 	command.Stderr = os.Stderr
 	environment := withEnvironment(
 		os.Environ(),
-		"CLAUDE_CONFIG_UPDATED_FROM",
+		updatedFromEnv,
 		args[4],
 	)
+	environment = withEnvironment(environment, restartModeEnv, "helper")
 	helperPath, _ := os.Executable()
 	command.Env = withEnvironment(environment, helperCleanupEnv, helperPath)
 	if err := command.Start(); err != nil {
