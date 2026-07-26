@@ -46,7 +46,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 Usage:
   claude-config [--scope global|project|local] [--project PATH]
   claude-config --no-update
-  claude-config statusline [--theme auto|claude|ansi|mono]
+  claude-config statusline [--theme auto|nerd|claude|ansi|mono]
   claude-config --version
 
 Options:`)
@@ -111,12 +111,12 @@ Options:`)
 func runStatusline(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("claude-config statusline", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	theme := flags.String("theme", "auto", "color theme: auto, claude, ansi, or mono")
+	theme := flags.String("theme", "auto", "color theme: auto, nerd, claude, ansi, or mono")
 	flags.Usage = func() {
 		fmt.Fprintln(flags.Output(), `Render Claude Code status JSON from stdin.
 
 Usage:
-  claude-config statusline [--theme auto|claude|ansi|mono]
+  claude-config statusline [--theme auto|nerd|claude|ansi|mono]
 
 Options:`)
 		flags.PrintDefaults()

@@ -10,7 +10,7 @@
 Code. Работает локально, не использует промпты и никуда не отправляет
 конфигурацию.
 
-![Интерфейс Claude Configurator](docs/screenshot.svg)
+![Интерфейс Claude Configurator](docs/tui-main.png)
 
 ## Возможности
 
@@ -23,8 +23,9 @@ Code. Работает локально, не использует промпт�
 - Типизированные настройки глубины вложенных агентов, общего и одновременного
   лимита сабагентов, параллельности tools, интерактивного `/init` и общего task
   list.
-- Статус-бар в стиле Claude с остатком контекста, реальными окнами 5h/7d и
-  временем до их сброса.
+- Статус-бар в стиле Claude с остатком контекста, реальными окнами 5h/7d,
+  точным локальным временем сброса, часовым поясом и countdown.
+- Автопроверка Nerd Font и отдельная иконочная тема.
 - Автолокализация TUI на английский, русский или упрощённый китайский.
 - Тёплая палитра Claude Code, чёткое разделение заголовков и подзаголовков,
   понятные объяснения «что меняет» и «зачем нужно».
@@ -45,13 +46,32 @@ curl -fsSL https://raw.githubusercontent.com/ex3lite/claude-configurator/main/sc
 ```
 
 Установщик проверяет checksum релиза и устанавливает команды `claude-config`,
-`claude-configurator` и `ccfg` в `~/.local/bin`.
+`claude-configurator` и `ccfg` в `~/.local/bin`. Если Nerd Font не найден,
+интерактивный запуск предложит скачать официальный архив MesloLGS, проверить
+его checksum и установить Mono-варианты только для текущего пользователя.
+
+Для автоматической установки шрифта без вопроса:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ex3lite/claude-configurator/main/scripts/install.sh |
+  CLAUDE_CONFIG_INSTALL_NERD_FONT=1 sh
+```
 
 ### Windows PowerShell
 
 ```powershell
 irm https://raw.githubusercontent.com/ex3lite/claude-configurator/main/scripts/install.ps1 | iex
 ```
+
+PowerShell предлагает ту же проверенную установку шрифта. Для
+неинтерактивного режима заранее задайте
+`$env:CLAUDE_CONFIG_INSTALL_NERD_FONT=1`.
+
+Установить и обнаружить шрифт можно автоматически, но дочерний процесс не
+может безопасно поменять шрифт уже открытого Terminal, iTerm2, Windows
+Terminal или VS Code. Перезапустите терминал и один раз выберите
+**MesloLGS Nerd Font Mono**. После этого пункт
+**Claude с иконками · Nerd Font v3** разблокируется автоматически.
 
 ### Через Go
 
@@ -69,7 +89,7 @@ claude-config
 claude-config --scope global|project|local
 claude-config --project /путь/к/проекту
 claude-config --no-update
-claude-config statusline --theme auto|claude|ansi|mono
+claude-config statusline --theme auto|nerd|claude|ansi|mono
 claude-config --help
 claude-config --version
 ```
@@ -113,6 +133,8 @@ provider-конфигураций; обычный выбор модели бол
 Подробнее — в
 [официальной документации моделей](https://code.claude.com/docs/en/model-config).
 
+![Fable 5 как основная модель и Sonnet 5 для сабагентов](docs/tui-models.png)
+
 ### Наследование, сброс и сохранение
 
 Первый пункт любого picker для уровней — **По умолчанию / наследовать**. Он
@@ -154,7 +176,7 @@ global, managed или стандартное разрешение Claude. Фи�
 
 Выберите **Claude CLI → Тема статус-бара**. Конфигуратор запишет:
 
-![Статус-бар в стиле Claude](docs/statusline.svg)
+![Статус-бар с локальными датами сброса](docs/statusline-limits.png)
 
 ```json
 {
@@ -168,17 +190,26 @@ global, managed или стандартное разрешение Claude. Фи�
 
 Панель использует
 [официальный JSON status line](https://code.claude.com/docs/en/statusline)
-Claude Code, а не парсит терминал. Она показывает модель, проект, Git-ветку, остаток контекста, локальное
-время, реальный остаток лимитов 5h/7d и countdown до сброса. Вторая строка при
-наличии данных показывает session, agent, effort, thinking, fast, Vim и output
-style.
+Claude Code, а не парсит терминал. Для каждого доступного окна 5h/7d видны
+progress bar, израсходованный и оставшийся процент, точная локальная дата и
+время сброса с часовым поясом и читаемый countdown:
+`сегодня, 17:00 (UTC+8) · через 3 ч 23 мин`. На широком терминале окна стоят в
+одной строке, на узком — переносятся раздельно. Выше показываются модель,
+проект, Git-ветка, остаток контекста и локальное время; ниже при наличии данных
+идут session, agent, effort, thinking, fast, Vim и output style.
 
-Доступны темы **Авто**, Claude clay true color, ANSI-палитра терминала и
-монохром. Авто учитывает `NO_COLOR`; на узком терминале сначала исчезают
-второстепенные сегменты. `rate_limits` Claude отдаёт только подписчикам
-Claude.ai Pro/Max после первого API-ответа, поэтому отсутствующие окна не
-подменяются выдуманными числами. **Сбросить → наследовать** у темы удаляет весь
+Доступны темы **Авто**, **Claude с иконками** для Nerd Font v3, Claude clay
+true color, ANSI-палитра терминала и монохром. Иконочный вариант появляется
+только после автоматического обнаружения Nerd Font. Авто учитывает `NO_COLOR`.
+`rate_limits` Claude отдаёт подписчикам Claude.ai Pro/Max после первого
+API-ответа. До этого строка явно сообщает, что ждёт данные; приложение не
+выдумывает проценты и даты. **Сбросить → наследовать** у темы удаляет весь
 override `statusLine` на выбранном уровне.
+
+Настоящий input bar Claude Code, автоматически снятый в изолированном
+`demo-project`:
+
+![Input bar Claude Code со строкой Claude Configurator](docs/claude-cli-statusline.png)
 
 ### Язык интерфейса
 
@@ -243,6 +274,8 @@ SHA-256, безопасно заменяется текущий бинарник
 - Не нужны цвета: запустите `NO_COLOR=1 claude-config`.
 - Лимитов в статус-баре нет: сначала отправьте один запрос Claude; поля
   доступны только для поддерживаемых подписок Claude.ai Pro/Max.
+- Иконочной темы нет: установите Nerd Font, перезапустите терминал и снова
+  откройте Claude Configurator. Обнаружение происходит автоматически.
 - Статус-бар не запускается: проверьте, что `claude-config` доступен в `PATH`
   процесса Claude Code, затем выберите тему повторно.
 - Обновление не устанавливается: проверьте права записи в каталог с
@@ -256,7 +289,18 @@ SHA-256, безопасно заменяется текущий бинарник
 go test -race ./...
 go vet ./...
 go run ./cmd/claude-config
+./scripts/update-screenshots.sh
 ```
+
+Скрипт скриншотов собирает текущий TUI, записывает реальные терминальные сессии
+через [VHS](https://github.com/charmbracelet/vhs) и проверяет наличие
+оранжевых акцентов Claude. Если Claude Code установлен, он также автоматически
+снимает настоящий input bar во временном `demo-project`; в публикуемый crop не
+попадают welcome-панель, аккаунт и домашний путь. Для получения официальных
+полей лимитов live-захват отправляет один минимальный запрос `Reply only: OK`;
+отключить его можно через `CLAUDE_CONFIG_CAPTURE_LIVE=0`. Workflow
+`Refresh screenshots` запускается при каждом обновлении `main` и коммитит
+изменившиеся детерминированные PNG.
 
 Claude Configurator — независимый проект сообщества, не связанный с Anthropic
 и не одобренный компанией. Claude является товарным знаком Anthropic.

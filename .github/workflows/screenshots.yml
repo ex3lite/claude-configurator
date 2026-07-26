@@ -1,0 +1,39 @@
+name: Refresh screenshots
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/*.png"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: screenshots-main
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: charmbracelet/vhs-action@59641cdc7fadf3978db65eb8c6937ea2752f4ec3
+        with:
+          version: v0.11.0
+          install-fonts: true
+      - run: ./scripts/update-screenshots.sh
+      - name: Commit refreshed screenshots
+        run: |
+          git add docs/tui-main.png docs/tui-models.png docs/statusline-limits.png docs/claude-cli-statusline.png
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs: refresh terminal screenshots [skip ci]"
+          git push origin HEAD:main

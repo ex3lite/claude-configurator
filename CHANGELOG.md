@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.5.0 — 2026-07-26
+
+- Added dedicated 5-hour and 7-day limit rows with progress bars, used and
+  remaining percentages, exact reset dates in the system timezone, and
+  localized countdowns.
+- Added explicit waiting text when Claude has not supplied `rate_limits`;
+  missing windows never receive invented values or dates.
+- Added automatic Nerd Font detection and a Claude icon status-line theme.
+- Added optional, checksum-verified MesloLGS Nerd Font installation to the
+  macOS, Linux, and Windows installers.
+- Replaced mock documentation artwork with reproducible VHS screenshots of the
+  real TUI, model picker, status-line renderer, and a privacy-safe live Claude
+  Code input bar.
+- Added automatic screenshot refreshes on `main`, with a color regression
+  check and an optional live Claude Code capture when the CLI is installed.
+- Strengthened the Claude clay, green, and violet palette and added a full-row
+  selection state so the TUI no longer reads as monochrome.
+
 ## v0.4.0 — 2026-07-26
 
 - Added a localized startup check for the latest stable GitHub Release.

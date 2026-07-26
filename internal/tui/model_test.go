@@ -362,6 +362,30 @@ func TestClaudeCLISettingsUseTypedPickersAndResetStatusLine(t *testing.T) {
 	}
 }
 
+func TestNerdFontThemeUnlock(t *testing.T) {
+	m := testModel(t)
+	index := slices.IndexFunc(catalog.Specs, func(spec catalog.Spec) bool {
+		return spec.ID == "statusline-theme"
+	})
+	if index < 0 {
+		t.Fatal("statusline theme spec not found")
+	}
+	command := "claude-config statusline --theme nerd"
+	m.nerdFont = false
+	if slices.Contains(m.withDynamicOptions(catalog.Specs[index]).Options, command) {
+		t.Fatal("Nerd Font theme is available without a Nerd Font")
+	}
+	m.nerdFont = true
+	if !slices.Contains(m.withDynamicOptions(catalog.Specs[index]).Options, command) {
+		t.Fatal("Nerd Font theme was not unlocked")
+	}
+	for _, name := range []string{"MesloLGS Nerd Font Mono", "UbuntuSansMono NFM"} {
+		if !isNerdFontName(name) {
+			t.Fatalf("%q was not detected as a Nerd Font", name)
+		}
+	}
+}
+
 func TestFooterAlwaysShowsActionsAlongsideStatus(t *testing.T) {
 	m := testModelWithSystemLanguage(t, "ru_RU.UTF-8")
 	m.noColor = true
@@ -502,7 +526,7 @@ func testModelWithSystemLanguage(t *testing.T, language string) *Model {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
 	t.Setenv("LOCALAPPDATA", filepath.Join(home, "AppData", "Local"))
-	t.Setenv("LC_ALL", "")
+	t.Setenv("LC_ALL", language)
 	t.Setenv("LC_MESSAGES", "")
 	t.Setenv("LANGUAGE", "")
 	t.Setenv("LANG", language)

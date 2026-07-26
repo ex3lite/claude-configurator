@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -72,6 +73,7 @@ type Options struct {
 	NoColor   bool
 	ColorTerm string
 	Term      string
+	Language  string
 }
 
 type segment struct {
@@ -118,10 +120,14 @@ func Render(data Data, options Options) (string, error) {
 	if options.Now.IsZero() {
 		options.Now = time.Now()
 	}
+	if options.Language == "" || options.Language == "auto" {
+		options.Language = systemLanguage()
+	}
 	colors, err := colorsFor(options)
 	if err != nil {
 		return "", err
 	}
+	icons := options.Theme == "nerd"
 
 	model := data.Model.DisplayName
 	if model == "" {
@@ -130,9 +136,15 @@ func Render(data Data, options Options) (string, error) {
 	if model == "" {
 		model = "Claude"
 	}
+	if icons {
+		model = "󰚩 " + model
+	}
 	segments := []segment{{text: shorten(model, 28), compact: shorten(model, 14), role: "accent"}}
 
 	if project := projectName(data); project != "" {
+		if icons {
+			project = " " + project
+		}
 		segments = append(segments, segment{text: project, role: "project", priority: 4})
 	}
 	branch := options.Branch
@@ -140,33 +152,41 @@ func Render(data Data, options Options) (string, error) {
 		branch = data.Worktree.Branch
 	}
 	if branch != "" {
-		segments = append(segments, segment{text: "git:" + shorten(branch, 24), role: "git", priority: 3})
+		prefix := "git:"
+		if icons {
+			prefix = " "
+		}
+		segments = append(segments, segment{text: prefix + shorten(branch, 24), role: "git", priority: 3})
 	}
 	if remaining, ok := contextRemaining(data); ok {
+		prefix := "ctx:"
+		if icons {
+			prefix = "󰍛 "
+		}
 		segments = append(segments, segment{
-			text:     fmt.Sprintf("ctx:%d%% left", percent(remaining)),
-			compact:  fmt.Sprintf("ctx:%d%%", percent(remaining)),
+			text:     fmt.Sprintf("%s%d%% left", prefix, percent(remaining)),
+			compact:  fmt.Sprintf("%s%d%%", prefix, percent(remaining)),
 			role:     usageRole(remaining),
 			priority: 1,
 		})
 	}
-	segments = append(segments, segment{text: options.Now.Format("15:04"), role: "muted", priority: 5})
-	if data.RateLimits.FiveHour != nil {
-		segments = append(segments, rateSegment("5h", *data.RateLimits.FiveHour, options.Now))
+	clock := options.Now.Format("15:04")
+	if icons {
+		clock = " " + clock
 	}
-	if data.RateLimits.SevenDay != nil {
-		segments = append(segments, rateSegment("7d", *data.RateLimits.SevenDay, options.Now))
-	}
+	segments = append(segments, segment{text: clock, role: "muted", priority: 5})
 
 	segments, plain := fit(segments, options.Columns)
 	first := paintSegments(colors, segments)
 	if plain != "" {
 		first = plain
 	}
+	lines := []string{first}
+	lines = append(lines, limitLines(data, colors, options)...)
 	if second := secondaryLine(data, colors, options.Columns); second != "" {
-		return first + "\n" + second, nil
+		lines = append(lines, second)
 	}
-	return first, nil
+	return strings.Join(lines, "\n"), nil
 }
 
 func projectName(data Data) string {
@@ -197,17 +217,94 @@ func contextRemaining(data Data) (float64, bool) {
 	return 0, false
 }
 
-func rateSegment(label string, window RateWindow, now time.Time) segment {
+type limitLine struct {
+	plain    string
+	rendered string
+}
+
+func limitLines(data Data, colors map[string]string, options Options) []string {
+	type rateItem struct {
+		label  string
+		window RateWindow
+	}
+	var windows []rateItem
+	if data.RateLimits.FiveHour != nil && data.RateLimits.FiveHour.ResetsAt > 0 {
+		windows = append(windows, rateItem{"5h", *data.RateLimits.FiveHour})
+	}
+	if data.RateLimits.SevenDay != nil && data.RateLimits.SevenDay.ResetsAt > 0 {
+		windows = append(windows, rateItem{"7d", *data.RateLimits.SevenDay})
+	}
+	if len(windows) == 0 {
+		message, compact := availabilityText(options.Language)
+		if options.Theme == "nerd" {
+			message, compact = " "+message, " "+compact
+		}
+		if options.Columns < lipgloss.Width(message) {
+			message = compact
+		}
+		return []string{paint(colors, "muted", shorten(message, options.Columns))}
+	}
+
+	full := make([]limitLine, 0, len(windows))
+	for _, item := range windows {
+		full = append(full, renderLimit(item.label, item.window, options, colors, true))
+	}
+	if len(full) == 2 {
+		plain := full[0].plain + "  │  " + full[1].plain
+		if lipgloss.Width(plain) <= options.Columns {
+			return []string{full[0].rendered + paint(colors, "muted", "  │  ") + full[1].rendered}
+		}
+	}
+
+	lines := make([]string, 0, len(windows))
+	for i, item := range windows {
+		line := full[i]
+		if lipgloss.Width(line.plain) > options.Columns {
+			line = renderLimit(item.label, item.window, options, colors, false)
+		}
+		if lipgloss.Width(line.plain) > options.Columns {
+			line.plain = shorten(line.plain, options.Columns)
+			line.rendered = paint(colors, usageRole(100-item.window.UsedPercentage), line.plain)
+		}
+		lines = append(lines, line.rendered)
+	}
+	return lines
+}
+
+func renderLimit(label string, window RateWindow, options Options, colors map[string]string, full bool) limitLine {
+	now := options.Now
+	used := clamp(window.UsedPercentage)
 	remaining := clamp(100 - window.UsedPercentage)
-	reset := ""
-	if window.ResetsAt > 0 {
-		reset = " · ↻" + until(time.Unix(window.ResetsAt, 0).Sub(now))
+	resetAt := time.Unix(window.ResetsAt, 0).In(now.Location())
+	reset := formatReset(resetAt, now, options.Language)
+	countdown := until(resetAt.Sub(now), options.Language)
+	words := wordsFor(options.Language)
+	if options.Theme == "nerd" {
+		label = " " + label
 	}
-	return segment{
-		text:    fmt.Sprintf("%s:%d%% left%s", label, percent(remaining), reset),
-		compact: fmt.Sprintf("%s:%d%%", label, percent(remaining)),
-		role:    usageRole(remaining),
+	role := usageRole(remaining)
+
+	if !full {
+		plain := fmt.Sprintf("%s  %d%% %s · %d%% %s · ↻ %s · %s",
+			label, percent(used), words.used, percent(remaining), words.left,
+			formatResetCompact(resetAt, now, options.Language), countdown)
+		return limitLine{plain: plain, rendered: paint(colors, role, plain)}
 	}
+
+	bar := progressBar(used, 10)
+	usage := fmt.Sprintf("%d%% %s · %d%% %s", percent(used), words.used, percent(remaining), words.left)
+	timing := fmt.Sprintf(" · %s %s · %s %s", words.resets, reset, words.in, countdown)
+	plain := label + "  " + bar + "  " + usage + timing
+	rendered := paint(colors, "accent", label) + "  " +
+		paint(colors, role, bar) + "  " +
+		paint(colors, role, usage) +
+		paint(colors, "muted", timing)
+	return limitLine{plain: plain, rendered: rendered}
+}
+
+func progressBar(used float64, width int) string {
+	filled := int(math.Round(clamp(used) * float64(width) / 100))
+	return strings.Repeat("▓", filled) + strings.Repeat("░", width-filled)
 }
 
 func secondaryLine(data Data, colors map[string]string, columns int) string {
@@ -314,16 +411,16 @@ func colorsFor(options Options) (map[string]string, error) {
 		}
 	}
 	switch theme {
-	case "claude":
+	case "claude", "nerd":
 		return map[string]string{
-			"accent":  "\x1b[1;38;2;217;119;87m",
-			"project": "\x1b[38;2;139;128;120m",
-			"git":     "\x1b[38;2;103;143;105m",
-			"context": "\x1b[38;2;139;111;177m",
-			"success": "\x1b[38;2;103;143;105m",
-			"warning": "\x1b[38;2;198;132;67m",
-			"danger":  "\x1b[38;2;194;65;59m",
-			"muted":   "\x1b[38;2;124;119;116m",
+			"accent":  "\x1b[1;38;2;240;138;104m",
+			"project": "\x1b[38;2;190;181;173m",
+			"git":     "\x1b[1;38;2;138;203;136m",
+			"context": "\x1b[1;38;2;199;160;255m",
+			"success": "\x1b[1;38;2;138;203;136m",
+			"warning": "\x1b[1;38;2;255;180;84m",
+			"danger":  "\x1b[1;38;2;255;107;99m",
+			"muted":   "\x1b[38;2;183;174;167m",
 		}, nil
 	case "ansi":
 		return map[string]string{
@@ -339,7 +436,7 @@ func colorsFor(options Options) (map[string]string, error) {
 	case "mono":
 		return map[string]string{}, nil
 	default:
-		return nil, fmt.Errorf("unknown status-line theme %q: use auto, claude, ansi, or mono", options.Theme)
+		return nil, fmt.Errorf("unknown status-line theme %q: use auto, nerd, claude, ansi, or mono", options.Theme)
 	}
 }
 
@@ -362,19 +459,177 @@ func clamp(value float64) float64 {
 	return math.Max(0, math.Min(100, value))
 }
 
-func until(duration time.Duration) string {
+type statusWords struct {
+	used   string
+	left   string
+	resets string
+	in     string
+}
+
+func wordsFor(language string) statusWords {
+	switch language {
+	case "ru":
+		return statusWords{"исп.", "ост.", "сброс", "через"}
+	case "zh-CN":
+		return statusWords{"已用", "剩余", "重置", "还有"}
+	default:
+		return statusWords{"used", "left", "resets", "in"}
+	}
+}
+
+func availabilityText(language string) (string, string) {
+	switch language {
+	case "ru":
+		return "лимиты: ждём данные Claude.ai · появятся после первого ответа Pro/Max",
+			"лимиты: недоступны в этой сессии"
+	case "zh-CN":
+		return "限额：正在等待 Claude.ai 数据 · Pro/Max 首次响应后显示",
+			"限额：此会话中不可用"
+	default:
+		return "limits: waiting for Claude.ai usage data · available after the first Pro/Max response",
+			"limits: unavailable in this session"
+	}
+}
+
+func formatReset(reset, now time.Time, language string) string {
+	timePart := reset.Format("15:04")
+	var datePart string
+	switch {
+	case sameDate(reset, now):
+		switch language {
+		case "ru":
+			datePart = "сегодня, " + timePart
+		case "zh-CN":
+			datePart = "今天 " + timePart
+		default:
+			datePart = "today, " + timePart
+		}
+	case sameDate(reset, now.AddDate(0, 0, 1)):
+		switch language {
+		case "ru":
+			datePart = "завтра, " + timePart
+		case "zh-CN":
+			datePart = "明天 " + timePart
+		default:
+			datePart = "tomorrow, " + timePart
+		}
+	default:
+		datePart = calendarDate(reset, now, language) + ", " + timePart
+	}
+	return datePart + " (" + timezoneLabel(reset) + ")"
+}
+
+func formatResetCompact(reset, now time.Time, language string) string {
+	full := formatReset(reset, now, language)
+	return strings.NewReplacer(", ", " ", " (", " ").Replace(full[:len(full)-1])
+}
+
+func calendarDate(value, now time.Time, language string) string {
+	monthsEN := [...]string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
+	monthsRU := [...]string{"янв.", "февр.", "мар.", "апр.", "мая", "июн.", "июл.", "авг.", "сент.", "окт.", "нояб.", "дек."}
+	year := ""
+	if value.Year() != now.Year() {
+		year = fmt.Sprintf(" %d", value.Year())
+	}
+	switch language {
+	case "ru":
+		return fmt.Sprintf("%d %s%s", value.Day(), monthsRU[value.Month()-1], year)
+	case "zh-CN":
+		if year != "" {
+			return fmt.Sprintf("%d年%d月%d日", value.Year(), value.Month(), value.Day())
+		}
+		return fmt.Sprintf("%d月%d日", value.Month(), value.Day())
+	default:
+		return fmt.Sprintf("%s %d%s", monthsEN[value.Month()-1], value.Day(), year)
+	}
+}
+
+func sameDate(left, right time.Time) bool {
+	left = left.In(right.Location())
+	return left.Year() == right.Year() && left.YearDay() == right.YearDay()
+}
+
+func timezoneLabel(value time.Time) string {
+	_, offset := value.Zone()
+	if offset == 0 {
+		return "UTC"
+	}
+	sign := "+"
+	if offset < 0 {
+		sign = "-"
+		offset = -offset
+	}
+	hours, minutes := offset/3600, offset%3600/60
+	if minutes == 0 {
+		return fmt.Sprintf("UTC%s%d", sign, hours)
+	}
+	return fmt.Sprintf("UTC%s%d:%02d", sign, hours, minutes)
+}
+
+func systemLanguage() string {
+	names := []string{os.Getenv("LC_ALL"), os.Getenv("LC_MESSAGES"), os.Getenv("LANGUAGE")}
+	if runtime.GOOS == "darwin" {
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		if output, err := exec.CommandContext(ctx, "/usr/bin/defaults", "read", "-g", "AppleLocale").Output(); err == nil {
+			names = append(names, strings.TrimSpace(string(output)))
+		}
+	}
+	names = append(names, os.Getenv("LANG"))
+	for _, name := range names {
+		normalized := strings.ToLower(strings.ReplaceAll(name, "_", "-"))
+		switch {
+		case strings.HasPrefix(normalized, "ru"):
+			return "ru"
+		case strings.HasPrefix(normalized, "zh"):
+			return "zh-CN"
+		case normalized != "" && normalized != "c" && normalized != "c.utf-8" && normalized != "posix":
+			return "en"
+		}
+	}
+	return "en"
+}
+
+func until(duration time.Duration, language string) string {
 	if duration <= 0 {
-		return "now"
+		switch language {
+		case "ru":
+			return "сейчас"
+		case "zh-CN":
+			return "现在"
+		default:
+			return "now"
+		}
 	}
 	minutes := int(math.Ceil(duration.Minutes()))
 	days := minutes / (24 * 60)
 	hours := minutes / 60 % 24
 	minutes %= 60
+	if language == "ru" {
+		switch {
+		case days > 0:
+			return fmt.Sprintf("%d д %d ч", days, hours)
+		case hours > 0:
+			return fmt.Sprintf("%d ч %d мин", hours, minutes)
+		default:
+			return fmt.Sprintf("%d мин", minutes)
+		}
+	}
+	if language == "zh-CN" {
+		switch {
+		case days > 0:
+			return fmt.Sprintf("%d天%d小时", days, hours)
+		case hours > 0:
+			return fmt.Sprintf("%d小时%d分钟", hours, minutes)
+		default:
+			return fmt.Sprintf("%d分钟", minutes)
+		}
+	}
 	switch {
 	case days > 0:
-		return fmt.Sprintf("%dd%dh", days, hours)
+		return fmt.Sprintf("%dd %dh", days, hours)
 	case hours > 0:
-		return fmt.Sprintf("%dh%dm", hours, minutes)
+		return fmt.Sprintf("%dh %dm", hours, minutes)
 	default:
 		return fmt.Sprintf("%dm", minutes)
 	}

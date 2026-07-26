@@ -65,6 +65,7 @@ type Model struct {
 	languageMode  uiLanguage
 	language      uiLanguage
 	preferences   string
+	nerdFont      bool
 
 	editSpec      catalog.Spec
 	choice        int
@@ -111,6 +112,7 @@ func New(workspace *config.Workspace, scope config.Scope, version string) *Model
 		languageMode: languageMode,
 		language:     resolveLanguage(languageMode),
 		preferences:  preferencesPath,
+		nerdFont:     nerdFontAvailable(),
 		drafts:       make(map[config.Scope]map[string]any, 3),
 	}
 	m.resetDrafts()
@@ -388,6 +390,14 @@ func (m *Model) openEditor() {
 }
 
 func (m *Model) withDynamicOptions(spec catalog.Spec) catalog.Spec {
+	if spec.ID == "statusline-theme" {
+		if !m.nerdFont {
+			spec.Options = slices.DeleteFunc(append([]string(nil), spec.Options...), func(option string) bool {
+				return option == "claude-config statusline --theme nerd"
+			})
+		}
+		return spec
+	}
 	if spec.ID != "theme" {
 		return spec
 	}
@@ -1183,15 +1193,16 @@ func (m *Model) renderCategoryMenu(width, height int) string {
 	for i := start; i < end; i++ {
 		category := categories[i]
 		marker := " "
-		titleStyle := m.text().Bold(true)
 		if i == m.category {
 			marker = "❯"
-			titleStyle = m.accent().Bold(true)
 		}
 		count := m.tr("category.settings_count", m.categoryCount(category))
 		left := truncate(marker+"  "+m.categoryLabel(category), max(4, width-lipgloss.Width(count)-1))
 		gap := max(1, width-lipgloss.Width(left)-lipgloss.Width(count))
-		title := titleStyle.Render(left) + strings.Repeat(" ", gap) + m.muted().Render(count)
+		title := m.text().Bold(true).Render(left) + strings.Repeat(" ", gap) + m.muted().Render(count)
+		if i == m.category {
+			title = m.selectedStyle().Width(width).Render(left + strings.Repeat(" ", gap) + count)
+		}
 		lines = append(lines, title)
 		lines = append(lines, m.muted().Render("    "+truncate(m.categoryDescription(category), max(4, width-4))))
 		if spacious && i < end-1 {
@@ -1265,6 +1276,7 @@ func (m *Model) renderDetail(width int) string {
 	if !ok {
 		return m.tr("empty.no_matches")
 	}
+	spec = m.withDynamicOptions(spec)
 	var own any
 	var ownOK bool
 	if spec.App {
@@ -1593,7 +1605,7 @@ func (m *Model) modalContentWidth() int {
 func (m *Model) selectedStyle() lipgloss.Style {
 	style := m.style("#8E3F29", "#FFF4EE").Bold(true)
 	if !m.noColor {
-		style = style.Background(m.color("#FBF0DF", "#3A241E"))
+		style = style.Background(m.color("#FBF0DF", "#5A3025"))
 	}
 	return style
 }
@@ -1601,13 +1613,13 @@ func (m *Model) selectedStyle() lipgloss.Style {
 func (m *Model) scopeStyle() lipgloss.Style {
 	style := m.style("#8E3F29", "#FFF4EE").Bold(true)
 	if !m.noColor {
-		style = style.Background(m.color("#F3D5C9", "#542D21"))
+		style = style.Background(m.color("#F3D5C9", "#6A3528"))
 	}
 	return style
 }
 
 func (m *Model) accent() lipgloss.Style {
-	return m.style("#B5573B", "#DA7756")
+	return m.style("#B5573B", "#F08A68")
 }
 
 func (m *Model) text() lipgloss.Style {
@@ -1615,7 +1627,7 @@ func (m *Model) text() lipgloss.Style {
 }
 
 func (m *Model) muted() lipgloss.Style {
-	return m.style("#6B6761", "#898781")
+	return m.style("#6B6761", "#A9A29A")
 }
 
 func (m *Model) warning() lipgloss.Style {
