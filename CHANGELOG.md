@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.8.0 — 2026-08-03
+
+- Added localized controls for Claude Code commit attribution, pull request
+  attribution, and cloud/Remote Control session links.
+- Added a clear **Hidden** choice that writes the documented empty-string value;
+  reset still removes the key and restores inheritance.
+- Corrected first-toggle behavior for Claude settings whose built-in default is
+  enabled, including auto compact, auto memory, Git instructions, and session links.
+- Documented the current `attribution` object and stopped recommending the
+  deprecated `includeCoAuthoredBy` setting.
+
 ## v0.7.1 — 2026-07-26
 
 - Kept the Unix self-update restart in the foreground terminal process so

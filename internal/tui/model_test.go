@@ -280,6 +280,78 @@ func TestSubagentPickerCanResetToInheritanceAndSelectFable(t *testing.T) {
 	}
 }
 
+func TestAttributionCanBeHiddenAndReset(t *testing.T) {
+	m := testModel(t)
+	m.category = slices.Index(catalog.Categories(), "Behavior")
+	m.focus = 1
+
+	for _, item := range []struct {
+		id   string
+		path string
+	}{
+		{"attribution-commit", "attribution.commit"},
+		{"attribution-pr", "attribution.pr"},
+	} {
+		selectSpec(t, m, item.id)
+		press(m, special(tea.KeyEnter))
+		if m.screen != editChoice {
+			t.Fatalf("%s editor screen = %v, want editChoice", item.id, m.screen)
+		}
+		selectChoice(t, m, "")
+		press(m, special(tea.KeyEnter))
+		if got, ok := config.Get(m.drafts[config.Global], item.path); !ok || got != "" {
+			t.Fatalf("%s = %#v, %v; want stored empty string", item.path, got, ok)
+		}
+	}
+
+	selectSpec(t, m, "session-url")
+	press(m, special(tea.KeyEnter))
+	if got, ok := config.Get(m.drafts[config.Global], "attribution.sessionUrl"); !ok || got != false {
+		t.Fatalf("attribution.sessionUrl = %#v, %v; want false", got, ok)
+	}
+
+	diff := strings.Join(m.diffLines(), "\n")
+	for _, line := range []string{
+		`+ attribution.commit = ""`,
+		`+ attribution.pr = ""`,
+		`+ attribution.sessionUrl = false`,
+	} {
+		if !strings.Contains(diff, line) {
+			t.Fatalf("diff is missing %q: %s", line, diff)
+		}
+	}
+
+	press(m, textKey("s"))
+	press(m, special(tea.KeyEnter))
+	raw, err := os.ReadFile(m.workspace.Paths.Global)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saved map[string]any
+	if err := json.Unmarshal(raw, &saved); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"attribution.commit", "attribution.pr"} {
+		if got, ok := config.Get(saved, path); !ok || got != "" {
+			t.Fatalf("saved %s = %#v, %v", path, got, ok)
+		}
+	}
+	if got, ok := config.Get(saved, "attribution.sessionUrl"); !ok || got != false {
+		t.Fatalf("saved attribution.sessionUrl = %#v, %v", got, ok)
+	}
+
+	for _, id := range []string{"attribution-commit", "attribution-pr", "session-url"} {
+		selectSpec(t, m, id)
+		press(m, textKey("u"))
+	}
+	if _, ok := saved["attribution"]; !ok {
+		t.Fatal("test setup did not save the attribution object")
+	}
+	if _, ok := m.drafts[config.Global]["attribution"]; ok {
+		t.Fatal("resetting all attribution fields left an empty attribution object")
+	}
+}
+
 func TestThemeUsesBuiltInChoicePicker(t *testing.T) {
 	m := testModel(t)
 	themeDir := filepath.Join(filepath.Dir(m.workspace.Paths.Global), "themes")

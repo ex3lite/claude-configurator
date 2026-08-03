@@ -166,6 +166,9 @@ func (m *Model) optionLabel(specID, option string) string {
 		}
 		return m.tr("option.custom_value")
 	}
+	if option == "" && strings.HasPrefix(specID, "attribution-") {
+		return m.tr("option.attribution.hidden")
+	}
 	if specID == "theme" && strings.HasPrefix(option, "custom:") {
 		return m.tr("option.theme.custom", strings.TrimPrefix(option, "custom:"))
 	}
@@ -255,7 +258,7 @@ var translations = map[uiLanguage]map[string]string{
 		"category.Permissions.description": "Define tool permissions and rules across configuration scopes.",
 		"category.Safety.description":      "Manage sandbox isolation and file recovery safeguards.",
 		"category.Interface.description":   "Adjust Claude Code and Claude Configurator presentation.",
-		"category.Behavior.description":    "Tune memory, Git instructions, and the update channel.",
+		"category.Behavior.description":    "Tune memory, Git attribution, instructions, and the update channel.",
 
 		"option.inherit":                           "Default / inherit",
 		"option.custom_model":                      "Custom model ID…",
@@ -289,6 +292,7 @@ var translations = map[uiLanguage]map[string]string{
 		"option.statusline-theme.ansi":             "ANSI · terminal palette",
 		"option.statusline-theme.mono":             "Monochrome · no color",
 		"option.statusline-theme.custom":           "Custom command…",
+		"option.attribution.hidden":                "Hidden",
 		"option.new-init.1":                        "Enabled",
 		"option.permission-allow.npm-test":         "Run npm tests",
 		"option.permission-allow.go-test":          "Run all Go tests",
@@ -427,7 +431,7 @@ var translations = map[uiLanguage]map[string]string{
 		"category.Permissions.description": "Разрешения инструментов на разных уровнях конфигурации.",
 		"category.Safety.description":      "Изоляция sandbox и восстановление изменённых файлов.",
 		"category.Interface.description":   "Внешний вид Claude Code и Claude Configurator.",
-		"category.Behavior.description":    "Память, Git-инструкции и канал обновлений.",
+		"category.Behavior.description":    "Память, Git-атрибуция, инструкции и канал обновлений.",
 
 		"option.inherit":                           "По умолчанию / наследовать",
 		"option.custom_model":                      "Другая модель…",
@@ -461,6 +465,7 @@ var translations = map[uiLanguage]map[string]string{
 		"option.statusline-theme.ansi":             "ANSI · палитра терминала",
 		"option.statusline-theme.mono":             "Монохром · без цветов",
 		"option.statusline-theme.custom":           "Своя команда…",
+		"option.attribution.hidden":                "Скрыто",
 		"option.new-init.1":                        "Включён",
 		"option.permission-allow.npm-test":         "Запускать npm-тесты",
 		"option.permission-allow.go-test":          "Запускать все Go-тесты",
@@ -618,6 +623,9 @@ var translations = map[uiLanguage]map[string]string{
 		"spec.reduced-motion.label":      "Меньше анимации",
 		"spec.auto-memory.label":         "Автопамять",
 		"spec.git-instructions.label":    "Git-инструкции",
+		"spec.attribution-commit.label":  "Подпись в коммитах",
+		"spec.attribution-pr.label":      "Подпись в pull request",
+		"spec.session-url.label":         "Ссылка на сессию",
 		"spec.updates.label":             "Канал обновлений",
 
 		"spec.main-model.description":          "Модель для новых сессий Claude Code. Стабильные алиасы автоматически следуют версии вашего провайдера.",
@@ -659,6 +667,9 @@ var translations = map[uiLanguage]map[string]string{
 		"spec.reduced-motion.description":      "Уменьшить необязательную терминальную анимацию.",
 		"spec.auto-memory.description":         "Разрешить Claude Code сохранять полезный контекст проекта.",
 		"spec.git-instructions.description":    "Добавлять встроенные инструкции рабочего процесса Git.",
+		"spec.attribution-commit.description":  "Атрибуция Claude в сообщениях Git-коммитов, включая трейлер Co-Authored-By.",
+		"spec.attribution-pr.description":      "Атрибуция Claude в описаниях pull request, например Generated with Claude Code.",
+		"spec.session-url.description":         "Добавлять ссылку на сессию Claude в коммиты и pull request из cloud или Remote Control.",
 		"spec.updates.description":             "Канал автоматических обновлений Claude Code.",
 
 		"spec.main-model.purpose":          "Определяет баланс качества, скорости и стоимости в обычной работе без отдельного флага при каждом запуске.",
@@ -700,6 +711,9 @@ var translations = map[uiLanguage]map[string]string{
 		"spec.reduced-motion.purpose":      "Повышает доступность и делает медленные или удалённые терминалы спокойнее.",
 		"spec.auto-memory.purpose":         "Переносит полезные знания о проекте в следующие сессии без повторного объяснения.",
 		"spec.git-instructions.purpose":    "Оставьте включённым, если проект не заменяет встроенный Git-процесс собственными правилами.",
+		"spec.attribution-commit.purpose":  "Оставьте значение унаследованным либо полностью скройте подпись Claude в коммитах.",
+		"spec.attribution-pr.purpose":      "Оставьте значение унаследованным либо полностью скройте подпись Claude в описаниях pull request.",
+		"spec.session-url.purpose":         "Отключите, если трейлеры коммитов и описания pull request не должны раскрывать ссылку на сессию Claude.",
 		"spec.updates.purpose":             "Stable предсказуемее; latest раньше получает новые функции и исправления Claude Code.",
 	},
 	languageZH: {
@@ -722,7 +736,7 @@ var translations = map[uiLanguage]map[string]string{
 		"category.Permissions.description": "定义不同配置层级的工具权限。",
 		"category.Safety.description":      "管理沙箱隔离和文件恢复保护。",
 		"category.Interface.description":   "调整 Claude Code 和 Claude Configurator 的显示。",
-		"category.Behavior.description":    "设置记忆、Git 指令和更新频道。",
+		"category.Behavior.description":    "设置记忆、Git 署名、指令和更新频道。",
 
 		"option.inherit":                           "默认 / 继承",
 		"option.custom_model":                      "自定义模型 ID…",
@@ -756,6 +770,7 @@ var translations = map[uiLanguage]map[string]string{
 		"option.statusline-theme.ansi":             "ANSI · 终端调色板",
 		"option.statusline-theme.mono":             "单色 · 无颜色",
 		"option.statusline-theme.custom":           "自定义命令…",
+		"option.attribution.hidden":                "隐藏",
 		"option.new-init.1":                        "已启用",
 		"option.permission-allow.npm-test":         "运行 npm 测试",
 		"option.permission-allow.go-test":          "运行全部 Go 测试",
@@ -913,6 +928,9 @@ var translations = map[uiLanguage]map[string]string{
 		"spec.reduced-motion.label":      "减少动画",
 		"spec.auto-memory.label":         "自动记忆",
 		"spec.git-instructions.label":    "Git 指令",
+		"spec.attribution-commit.label":  "提交署名",
+		"spec.attribution-pr.label":      "Pull request 署名",
+		"spec.session-url.label":         "会话链接署名",
 		"spec.updates.label":             "更新频道",
 
 		"spec.main-model.description":          "新 Claude Code 会话使用的模型。稳定别名会跟随提供商的最新可用版本。",
@@ -954,6 +972,9 @@ var translations = map[uiLanguage]map[string]string{
 		"spec.reduced-motion.description":      "减少非必要的终端动画。",
 		"spec.auto-memory.description":         "允许 Claude Code 自动保存有用的项目上下文。",
 		"spec.git-instructions.description":    "包含 Claude Code 内置的 Git 工作流说明。",
+		"spec.attribution-commit.description":  "添加到 Git 提交消息中的 Claude 署名，包括 Co-Authored-By trailer。",
+		"spec.attribution-pr.description":      "添加到 pull request 描述中的 Claude 署名，例如 Generated with Claude Code。",
+		"spec.session-url.description":         "在 cloud 或 Remote Control 会话创建的提交和 pull request 中附加 Claude 会话链接。",
 		"spec.updates.description":             "Claude Code 自动更新频道。",
 
 		"spec.main-model.purpose":          "决定日常工作的能力、速度和成本，无需每次启动都传入模型参数。",
@@ -995,6 +1016,9 @@ var translations = map[uiLanguage]map[string]string{
 		"spec.reduced-motion.purpose":      "提升可访问性，并让较慢或远程终端更平静。",
 		"spec.auto-memory.purpose":         "把有用的项目知识带到后续会话，无需重复说明。",
 		"spec.git-instructions.purpose":    "如果项目没有自己的 Git 工作流规则，建议保持开启。",
+		"spec.attribution-commit.purpose":  "保留继承的 Claude 默认值，或隐藏提交中的全部 Claude 署名。",
+		"spec.attribution-pr.purpose":      "保留继承的 Claude 默认值，或隐藏 pull request 描述中的全部 Claude 署名。",
+		"spec.session-url.purpose":         "如果提交 trailer 和 pull request 描述不应暴露 Claude 会话链接，请关闭此项。",
 		"spec.updates.purpose":             "stable 更可预测；latest 更早获得 Claude Code 新功能和修复。",
 	},
 }

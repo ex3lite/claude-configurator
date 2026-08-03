@@ -118,6 +118,7 @@ claude-config --version
 - Ready, localized templates for `permissions.allow`, `ask`, and `deny`, with
   the exact Claude Code rule shown before it is selected.
 - Reasoning, agents, permissions, sandbox, interface, and behavior settings.
+- Separate controls for commit, pull request, and Claude session-link attribution.
 - Typed controls for nested-agent depth, total/concurrent subagent caps, tool
   concurrency, interactive `/init`, and shared task lists.
 - Claude-style status bar themes with primary/subagent/advisor model roles,
@@ -193,6 +194,28 @@ panel and action bar.
 
 Changes remain staged until **[S] Save**. Save is always visible, shows the
 number of changed settings, and opens a diff before writing the file.
+
+### Git attribution
+
+Open **Behavior** to control the three current
+[Claude Code attribution settings](https://code.claude.com/docs/en/settings#attribution-settings).
+Choose **Hidden** for commit and pull request attribution, then turn off the
+session link to remove every built-in byline:
+
+```json
+{
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  }
+}
+```
+
+**Default / inherit** removes the selected key and restores scope inheritance.
+The deprecated `includeCoAuthoredBy` key is not written.
+
+![Commit attribution picker](docs/screenshots/en/tui-attribution.png)
 
 ### Claude Code theme
 

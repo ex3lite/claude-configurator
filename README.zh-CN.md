@@ -115,6 +115,7 @@ claude-config --version
 - 为 `permissions.allow`、`ask` 和 `deny` 提供本地化预设，并在选择前
   显示准确的 Claude Code 规则。
 - 配置推理、代理、权限、沙箱、界面和行为。
+- 分别控制提交、pull request 和 Claude 会话链接署名。
 - 使用类型化控件设置嵌套代理深度、子代理总数/并发数、工具并发、
   交互式 `/init` 和共享任务列表。
 - Claude 风格状态栏分别显示主模型、子代理模型和 advisor，并显示剩余上下文、
@@ -184,6 +185,28 @@ gateway 或提供商特定部署；常规模型选择不会打开字符串输入
 
 所有更改在按下 **[S] 保存**前保持暂存。保存按钮始终可见，会显示更改
 数量，并在写入前打开 diff。
+
+### Git 署名
+
+在**行为**分类中可以配置当前三项
+[Claude Code 署名设置](https://code.claude.com/docs/en/settings#attribution-settings)。
+将提交署名和 pull request 署名设为**隐藏**，再关闭会话链接，即可移除
+全部内置署名：
+
+```json
+{
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  }
+}
+```
+
+选择**默认 / 继承**会删除对应键并恢复作用域继承。Configurator 不会写入
+已弃用的 `includeCoAuthoredBy`。
+
+![提交署名选择器](docs/screenshots/zh-CN/tui-attribution.png)
 
 ### Claude Code 主题
 

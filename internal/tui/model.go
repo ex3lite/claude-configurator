@@ -484,7 +484,7 @@ func (m *Model) choiceIncludesInherit() bool {
 }
 
 func (m *Model) toggle(spec catalog.Spec) {
-	current := false
+	current := spec.DefaultTrue
 	if value, _, ok := m.effective(spec); ok {
 		current, _ = value.(bool)
 	}
@@ -972,6 +972,9 @@ func (m *Model) diffLines() []string {
 func formatValue(value any) string {
 	switch typed := value.(type) {
 	case string:
+		if typed == "" {
+			return `""`
+		}
 		return typed
 	case bool:
 		if typed {

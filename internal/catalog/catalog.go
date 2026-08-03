@@ -29,6 +29,7 @@ type Spec struct {
 	Danger        map[string]string
 	App           bool
 	Hidden        bool
+	DefaultTrue   bool
 }
 
 func (s Spec) Dangerous(value any) (string, bool) {
@@ -47,7 +48,7 @@ var Specs = []Spec{
 
 	{ID: "effort", Path: "effortLevel", Label: "Reasoning effort", Category: "Reasoning", Kind: Enum, Options: []string{"low", "medium", "high", "xhigh"}, Description: "Persistent adaptive reasoning effort for models that support it.", Purpose: "Lower levels answer faster and cheaper; higher levels spend more reasoning on difficult tasks."},
 	{ID: "always-thinking", Path: "alwaysThinkingEnabled", Label: "Extended thinking", Category: "Reasoning", Kind: Boolean, Description: "Enable extended thinking by default on supported models.", Purpose: "Improve complex reasoning when extra latency and token use are acceptable."},
-	{ID: "auto-compact", Path: "autoCompactEnabled", Label: "Auto compact", Category: "Reasoning", Kind: Boolean, Description: "Summarize and compact a conversation automatically near its context limit.", Purpose: "Prevent long sessions from stopping at the limit, with the trade-off that a summary can omit detail."},
+	{ID: "auto-compact", Path: "autoCompactEnabled", Label: "Auto compact", Category: "Reasoning", Kind: Boolean, DefaultTrue: true, Description: "Summarize and compact a conversation automatically near its context limit.", Purpose: "Prevent long sessions from stopping at the limit, with the trade-off that a summary can omit detail."},
 
 	{ID: "agent-teams", Path: "env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", Label: "Agent teams", Category: "Agents", Kind: Enum, Options: []string{"0", "1"}, Description: "Enable the experimental feature that lets several Claude agents coordinate on one task.", Purpose: "Use it when independent parts of a task can run in parallel; experimental behavior can still change."},
 	{ID: "teammate-mode", Path: "teammateMode", Label: "Teammate display", Category: "Agents", Kind: Enum, Options: []string{"in-process", "auto", "tmux", "iterm2"}, Description: "Choose where agent-team teammates are displayed.", Purpose: "Keep agents inline for a simple terminal, or use separate panes when you want to monitor each teammate."},
@@ -84,8 +85,11 @@ var Specs = []Spec{
 	{ID: "language", Path: "language", Label: "Claude response language", Category: "Interface", Kind: String, Description: "Preferred language for Claude responses, dictation, and terminal session titles.", Purpose: "Avoid repeating the same language instruction in every prompt."},
 	{ID: "reduced-motion", Path: "prefersReducedMotion", Label: "Reduced motion", Category: "Interface", Kind: Boolean, Description: "Reduce non-essential spinners, shimmer, and terminal animation.", Purpose: "Improve accessibility and make remote or slow terminals feel calmer."},
 
-	{ID: "auto-memory", Path: "autoMemoryEnabled", Label: "Auto memory", Category: "Behavior", Kind: Boolean, Description: "Allow Claude Code to save useful project context automatically.", Purpose: "Carry project knowledge into later sessions without explaining it again."},
-	{ID: "git-instructions", Path: "includeGitInstructions", Label: "Git instructions", Category: "Behavior", Kind: Boolean, Description: "Include Claude Code's built-in commit and pull-request workflow guidance.", Purpose: "Keep it unless the project already supplies its own Git workflow rules."},
+	{ID: "auto-memory", Path: "autoMemoryEnabled", Label: "Auto memory", Category: "Behavior", Kind: Boolean, DefaultTrue: true, Description: "Allow Claude Code to save useful project context automatically.", Purpose: "Carry project knowledge into later sessions without explaining it again."},
+	{ID: "git-instructions", Path: "includeGitInstructions", Label: "Git instructions", Category: "Behavior", Kind: Boolean, DefaultTrue: true, Description: "Include Claude Code's built-in commit and pull-request workflow guidance.", Purpose: "Keep it unless the project already supplies its own Git workflow rules."},
+	{ID: "attribution-commit", Path: "attribution.commit", Label: "Commit attribution", Category: "Behavior", Kind: Enum, Options: []string{""}, Description: "Claude attribution added to Git commit messages, including the Co-Authored-By trailer.", Purpose: "Choose the inherited Claude default or hide all Claude attribution from commits."},
+	{ID: "attribution-pr", Path: "attribution.pr", Label: "Pull request attribution", Category: "Behavior", Kind: Enum, Options: []string{""}, Description: "Claude attribution added to pull request descriptions, such as Generated with Claude Code.", Purpose: "Choose the inherited Claude default or hide all Claude attribution from pull request bodies."},
+	{ID: "session-url", Path: "attribution.sessionUrl", Label: "Session link attribution", Category: "Behavior", Kind: Boolean, DefaultTrue: true, Description: "Append a Claude session link to commits and pull requests created from cloud or Remote Control sessions.", Purpose: "Turn this off when commit trailers and pull request descriptions must not expose a Claude session link."},
 	{ID: "updates", Path: "autoUpdatesChannel", Label: "Update channel", Category: "Behavior", Kind: Enum, Options: []string{"stable", "latest"}, Description: "Choose the Claude Code automatic update channel.", Purpose: "Stable favors predictability; latest delivers new features and fixes sooner."},
 }
 

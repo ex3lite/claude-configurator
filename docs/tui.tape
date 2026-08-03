@@ -45,4 +45,21 @@ Wait+Screen /__FALLBACK_WAIT__/
 Sleep 500ms
 Screenshot "__OUTPUT_DIR__/tui-fallback.png"
 Sleep 500ms
+Type "q"
+Left
+Down
+Down
+Down
+Down
+Down
+Down
+Down
+Enter
+Down
+Down
+Enter
+Wait+Screen /__ATTRIBUTION_WAIT__/
+Sleep 500ms
+Screenshot "__OUTPUT_DIR__/tui-attribution.png"
+Sleep 500ms
 Ctrl+C
